@@ -333,6 +333,7 @@ const CONFIG = {
   // --- Vídeo / pós-processamento --------------------------------------------
   video: {
     crt: true, // filtro CRT GLOBAL (scanlines + vinheta) em TODAS as telas
+    instrucoesCombate: true,
   },
 
   /* --- IA (3 dificuldades) -------------------------------------------------
@@ -409,7 +410,7 @@ const START_TIMING = {
 };
 // Teclas que NÃO contam como "qualquer tecla" (toggles globais de debug/CRT,
 // teclas do navegador) — assim F1/F2 não pulam a intro nem avançam o título.
-const START_IGNORAR_TECLAS = new Set(["F1", "F2", "F3", "F5", "F11", "F12"]);
+const START_IGNORAR_TECLAS = new Set(["Tab", "ShiftLeft", "ShiftRight", "F1", "F2", "F3", "F5", "F11", "F12"]);
 
 /* IDENTIDADE VISUAL — paleta de 3 cores dominantes + 1 acento neon (roxo
    elétrico). Centralizada para que logo, menu e atmosfera fiquem coerentes. */

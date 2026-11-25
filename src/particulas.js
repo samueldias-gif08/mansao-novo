@@ -79,6 +79,18 @@ class Particulas {
     this.lista = this.lista.filter((p) => p.vida > 0);
   }
 
+  folhas(x, y, quantidade, forca, cores = ["#1adb89", "#a9ff86"]) {
+    for (let i = 0; i < quantidade; i++) {
+      const angulo = Math.random() * Math.PI * 2;
+      const velocidade = forca * (0.35 + Math.random() * 0.65);
+      this._add({
+        x, y, vx: Math.cos(angulo) * velocidade, vy: Math.sin(angulo) * velocidade - 20,
+        vida: 0.38, vidaMax: 0.38, raio: 3 + Math.random() * 3,
+        cor: cores[i % 2], grav: 165, brilho: true, folha: angulo,
+      });
+    }
+  }
+
   desenhar(ctx) {
     ctx.save();
     for (const p of this.lista) {
@@ -88,7 +100,8 @@ class Particulas {
       ctx.globalAlpha = a;
       ctx.fillStyle = p.cor;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, p.raio, 0, Math.PI * 2);
+      if (p.folha != null) ctx.ellipse(p.x, p.y, p.raio * 1.5, p.raio * 0.48, p.folha + p.vida * 17, 0, Math.PI * 2);
+      else ctx.arc(p.x, p.y, p.raio, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.restore();

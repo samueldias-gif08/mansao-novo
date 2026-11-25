@@ -93,6 +93,12 @@ definidos: `MUNDO_L`, `ALTURA`, `CHAO_Y` (config) e `carregarImagem` (recursos).
 
 ## 3. Fluxo de boot (`main.js`)
 
+A tela de título e o menu de modos compartilham a capa original pré-carregada de
+`assets/backgrounds/mansao_fight_cover.png`. Salve a arte nesse caminho, de
+preferência em 16:9. A imagem é exibida como fundo centralizado do canvas,
+mantendo sua proporção. As faixas de texto, partículas e transições são desenhadas
+sobre ela. Se o arquivo estiver ausente, os menus abrem sobre uma cor neutra.
+
 `iniciar()` é assíncrona e roda assim que o DOM está pronto:
 
 ```

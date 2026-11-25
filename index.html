@@ -7,12 +7,25 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <!-- Moldura do jogo. Todo o desenho acontece dentro do <canvas>. -->
-    <div id="moldura">
-      <canvas id="tela" width="960" height="540"></canvas>
-      <!-- Aviso exibido apenas se o manifest não puder ser carregado (ex.: file:// no Chrome). -->
-      <div id="aviso" class="oculto"></div>
-    </div>
+    <main id="palco">
+      <aside class="painel-combate painel-combate--p1" aria-labelledby="titulo-p1" hidden>
+        <h2 id="titulo-p1">JOGADOR 1</h2>
+        <dl></dl>
+      </aside>
+      <div id="moldura">
+        <canvas id="tela" width="960" height="540"></canvas>
+        <nav id="acoes-titulo" aria-label="Menu principal" hidden>
+          <button id="assistir-historia" type="button" aria-keyshortcuts="H">História</button>
+        </nav>
+        <button id="pular-historia" type="button" aria-keyshortcuts="Enter Escape" hidden>Pular história</button>
+        <!-- Aviso exibido apenas se o manifest não puder ser carregado (ex.: file:// no Chrome). -->
+        <div id="aviso" class="oculto"></div>
+      </div>
+      <aside class="painel-combate painel-combate--p2" aria-labelledby="titulo-p2" hidden>
+        <h2 id="titulo-p2">JOGADOR 2</h2>
+        <dl></dl>
+      </aside>
+    </main>
 
     <!-- Lógica do jogo, dividida em módulos. São <script> CLÁSSICOS (sem
        type=module): compartilham o mesmo escopo global, então as classes/consts
@@ -25,11 +38,17 @@
     <script src="src/cenario.js"></script>
     <script src="src/animator.js"></script>
     <script src="src/controles.js"></script>
+    <script src="src/paineis-combate.js"></script>
     <script src="src/particulas.js"></script>
     <script src="src/audio.js"></script>
     <script src="src/projetil.js"></script>
     <script src="src/fighter.js"></script>
     <script src="src/selecao.js"></script>
+    <script src="src/selecao-visual.js"></script>
+    <script src="src/menu-visual.js"></script>
+    <script src="src/historia-cenas.js"></script>
+    <script src="src/historia-audio.js"></script>
+    <script src="src/historia.js"></script>
     <script src="src/jogo.js"></script>
     <script src="src/main.js"></script>
   </body>

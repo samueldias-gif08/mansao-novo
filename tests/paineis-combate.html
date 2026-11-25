@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<title>Teste dos painéis de combate</title>
+<pre id="resultado">Executando…</pre>
+<script>
+  const resultado = document.querySelector("#resultado");
+  function verificar(condicao, mensagem) {
+    if (!condicao) throw new Error(mensagem);
+  }
+
+  async function testar() {
+    const resposta = await fetch("../index.html");
+    const fonte = (await resposta.text())
+      .replace("<head>", '<head><base href="../">')
+      .replace('<script src="src/main.js"><\/script>', "");
+    for (const largura of [1280, 360]) {
+      const quadro = document.createElement("iframe");
+      quadro.style.cssText = `width:${largura}px;height:720px;border:0`;
+      const carregou = new Promise((resolve) => quadro.addEventListener("load", resolve));
+      quadro.srcdoc = fonte;
+      document.body.append(quadro);
+      await carregou;
+
+      const testarJogo = quadro.contentWindow.Function(`
+        const jogo = new Jogo(document.querySelector("#tela"), {}, null, { tocar() {} }, { tocar() {} });
+        let quadro;
+        window.requestAnimationFrame = (callback) => { quadro = callback; };
+        jogo._atualizar = () => {};
+        jogo._desenhar = () => {};
+        jogo._desenharFlashGlobal = () => {};
+        jogo.rodar();
+        return { jogo, rodarQuadro: () => quadro(performance.now()), TELAS, CONFIGS };
+      `);
+      const { jogo, rodarQuadro, TELAS, CONFIGS } = testarJogo();
+      const janela = quadro.contentWindow;
+      const [p1, p2] = quadro.contentDocument.querySelectorAll("aside");
+      rodarQuadro();
+      verificar(p1.hidden && p2.hidden, "Painéis fora da luta");
+      jogo.tela = TELAS.LUTA;
+      rodarQuadro();
+      verificar(!p1.hidden && !p2.hidden, "Painéis ligados por padrão");
+      const mapaTeclas = (painel) => Array.from(painel.querySelectorAll("kbd"),
+        (tecla) => tecla.textContent).join(" ");
+      verificar(mapaTeclas(p1) === "A D W S F G H C V R T", "Mapa de teclas do Jogador 1");
+      verificar(mapaTeclas(p2) === "← → ↑ ↓ J K L N M P Y", "Mapa de teclas do Jogador 2");
+      const { combate: carter } = await fetch("../assets/data/players/carter.json").then((r) => r.json());
+      const { combate: greeg } = await fetch("../assets/data/players/greeg.json").then((r) => r.json());
+      const { combate: morgana } = await fetch("../assets/data/players/morgana.json").then((r) => r.json());
+      for (const [slot, painel, outro] of [["p1", p1, p2], ["p2", p2, p1]]) {
+        jogo.paineisCombate.definirLutador(slot, carter);
+        for (const rotulo of ["Voar lateralmente", "Subir", "Descer", "Ataque Bumerangue", "Corte com o Bico"]) {
+          verificar(painel.textContent.includes(rotulo) && !outro.textContent.includes(rotulo), "Controles exclusivos de " + slot);
+        }
+        jogo.paineisCombate.definirLutador(slot, {});
+        verificar(painel.textContent.includes("Andar / Correr"), "Controles restaurados em " + slot);
+        jogo.paineisCombate.definirLutador(slot, greeg);
+        const teclasGreeg = Array.from(painel.querySelectorAll("dl > div"), (linha) => linha.textContent);
+        verificar(teclasGreeg.some((linha) => linha.includes("Proteção absoluta") &&
+          linha.endsWith(slot === "p1" ? "V" : "M")), "Casco na tecla correta " + slot);
+        verificar(teclasGreeg.some((linha) => linha.includes("Ondas de som") &&
+          linha.endsWith(slot === "p1" ? "T" : "Y")), "Ondas na tecla correta " + slot);
+        verificar(!outro.textContent.includes("Proteção absoluta"), "Painel do adversário independente");
+        jogo.paineisCombate.definirLutador(slot, morgana);
+        const linhasMorgana = Array.from(painel.querySelectorAll("dl > div"), (linha) => linha.textContent);
+        const especiaisMorgana = [["Soco triplo", "F", "J"], ["Rajada de vento", "V", "M"], ["Raios do céu", "T", "Y"]];
+        for (const [rotulo, esquerda, direita] of especiaisMorgana) {
+          verificar(linhasMorgana.some((linha) => linha.includes(rotulo) && linha.endsWith(slot === "p1" ? esquerda : direita))
+            && !outro.textContent.includes(rotulo), "Habilidade da Morgana no painel de " + slot);
+        }
+        jogo.paineisCombate.definirLutador(slot, {});
+      }
+      const a = jogo.canvas.getBoundingClientRect();
+      const e = p1.getBoundingClientRect();
+      const d = p2.getBoundingClientRect();
+      verificar(Math.abs(a.width / a.height - 16 / 9) < 0.01, "Proporção da arena");
+      verificar(Math.abs(a.left + a.right - largura) < 2, "Centralização da arena");
+      verificar(e.height === d.height && Math.abs(e.width - d.width) < 1, "Simetria");
+      verificar(d.bottom <= 720 && d.right <= largura, "Painéis dentro da tela");
+      verificar(largura === 1280 ? e.right <= a.left && d.left >= a.right :
+        e.top >= a.bottom && d.top >= a.bottom, "Painéis fora da arena");
+
+      const pressionadas = (painel) => Array.from(painel.querySelectorAll("kbd.pressionada"),
+        (tecla) => tecla.textContent).join(" ");
+      const tecla = (tipo, code) => janela.dispatchEvent(new janela.KeyboardEvent(tipo, { code }));
+      for (const codigo of ["KeyA", "KeyF", "ArrowRight", "KeyJ"]) tecla("keydown", codigo);
+      rodarQuadro();
+      verificar(pressionadas(p1) === "A F" && pressionadas(p2) === "→ J", "Destaques simultâneos");
+      tecla("keyup", "KeyA");
+      tecla("keyup", "KeyJ");
+      rodarQuadro();
+      verificar(pressionadas(p1) === "F" && pressionadas(p2) === "→", "Soltura independente");
+      tecla("keyup", "KeyF");
+      tecla("keyup", "ArrowRight");
+      rodarQuadro();
+      verificar(!pressionadas(p1) && !pressionadas(p2), "Destaques apagados");
+
+      jogo.configIndex = CONFIGS.findIndex((item) => item.id === "instrucoesCombate");
+      jogo.entrada.confirmar = true;
+      jogo._atualizarConfig();
+      rodarQuadro();
+      verificar(p1.hidden && p2.hidden, "Configuração desativa os painéis");
+      jogo.entrada.confirmar = true;
+      jogo._atualizarConfig();
+      rodarQuadro();
+      verificar(!p1.hidden && !p2.hidden, "Configuração reativa os painéis");
+      quadro.remove();
+    }
+    resultado.textContent = "PASSOU";
+  }
+  testar().catch((erro) => { resultado.textContent = "FALHOU: " + erro.message; });
+</script>
+</html>

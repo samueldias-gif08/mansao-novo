@@ -80,6 +80,9 @@ class Recursos {
     this.faltando = 0;
     // Retratos da tela de seleção (fotos reais), por personagem.
     this.retratos = {};
+    this.artesSelecao = {};
+    this.artesHistoria = {};
+    this.capaMenu = null;
     // Imagem de fundo da arena (largura = MUNDO_L x altura = ALTURA).
     // Opcional: se não existir, o cenário procedural é usado como fallback.
     this.mapa = null;
@@ -87,6 +90,18 @@ class Recursos {
 
   async precarregar(onProgresso) {
     const tarefas = [];
+    tarefas.push(carregarImagem("menu.png").then(({ ok, img }) => {
+      this.capaMenu = ok ? img : null;
+    }));
+    const artesHistoria = ["janela.jpg", "quarto.jpg", "rua.jpg", "mansao.jpg", "efeitos.png"];
+    for (const id of ["p1", "p2", "p3"]) {
+      for (let i = 0; i < 4; i++) artesHistoria.push(`${id}-${i}.png`);
+    }
+    for (const arquivo of artesHistoria) {
+      tarefas.push(carregarImagem(`assets/historia/${arquivo}`).then(({ ok, img }) => {
+        if (ok) this.artesHistoria[arquivo.split(".")[0]] = img;
+      }));
+    }
 
     // Retratos para a seleção de personagem. O ARQUIVO vem do manifest
     // (players.<p>.retrato), ficando em assets/retratos/. Se o campo faltar ou
@@ -103,6 +118,14 @@ class Recursos {
         }),
       );
     }
+    for (const [pers, arquivos] of Object.entries(this.manifest.artesSelecao || {})) {
+      const arte = this.artesSelecao[pers] = {};
+      for (const [tipo, arquivo] of Object.entries(arquivos)) {
+        tarefas.push(carregarImagem(`assets/apresentacao/${arquivo}`).then(({ ok, img }) => {
+          if (ok) arte[tipo] = img;
+        }));
+      }
+    }
 
     // Fundo da arena. O ARQUIVO vem do manifest ("mapa"); assim dá para trocar
     // de mapa só editando o JSON, sem mexer no código. Se o campo faltar, usa
@@ -116,15 +139,18 @@ class Recursos {
 
     for (const player of Object.keys(this.manifest.players)) {
       this.dados[player] = {};
-      const anims = this.manifest.players[player].animacoes;
+      const imagens = new Map();
+      const { animacoes: anims, pastaSprites = player } = this.manifest.players[player];
       for (const nomeAnim of Object.keys(anims)) {
         const meta = anims[nomeAnim];
         const registro = { meta, frames: new Array(meta.frames) };
         this.dados[player][nomeAnim] = registro;
         for (let i = 0; i < meta.frames; i++) {
-          const caminho = `assets/sprites/${player}/${nomeAnim}_${i}.png`;
+          const nome = meta.poses ? `pose_${meta.poses[i]}` : `${nomeAnim}_${i}`;
+          const caminho = `assets/sprites/${pastaSprites}/${nome}.png`;
+          if (!imagens.has(caminho)) imagens.set(caminho, carregarImagem(caminho));
           tarefas.push(
-            carregarImagem(caminho).then((res) => {
+            imagens.get(caminho).then((res) => {
               if (!res.ok) this.faltando++;
               registro.frames[i] = res;
             }),

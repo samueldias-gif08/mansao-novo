@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<base href="/">
+<title>Teste da Android 6.7</title>
+<canvas width="960" height="540"></canvas>
+<pre id="resultado">Executando…</pre>
+<script src="src/config.js"></script>
+<script src="src/constantes.js"></script>
+<script src="src/recursos.js"></script>
+<script src="src/animator.js"></script>
+<script src="src/controles.js"></script>
+<script src="src/particulas.js"></script>
+<script src="src/audio.js"></script>
+<script src="src/projetil.js"></script>
+<script src="src/fighter.js"></script>
+<script src="src/selecao.js"></script>
+<script src="src/jogo.js"></script>
+<script>
+"use strict";
+async function testar() {
+  const recursos = new Recursos(await carregarManifest());
+  await recursos.precarregar();
+  const jogo = new Jogo(document.querySelector("canvas"), recursos, null, {}, { tocar() {} });
+  function exigir(condicao, mensagem) {
+    if (!condicao) throw new Error(mensagem);
+  }
+  jogo._iniciarSelect();
+  const indice = SELECT_CELULAS.findIndex((celula) => celula.pers === "android67");
+  for (const slot of ["p1", "p2"]) {
+    const { x, y, w, h } = jogo._retCelulaSelect(indice);
+    const area = jogo.canvas.getBoundingClientRect();
+    jogo.canvas.dispatchEvent(new MouseEvent("click", {
+      clientX: area.left + (x + w / 2) * area.width / LARGURA,
+      clientY: area.top + (y + h / 2) * area.height / ALTURA,
+    }));
+    exigir(jogo.confirmado[slot] && PERSONAGENS[jogo.escolha[slot]] === "android67", "Seleção por clique " + slot);
+  }
+  exigir(recursos.retrato("android67")?.naturalWidth > 0, "Retrato carregado");
+  exigir(recursos.ficha("android67").estilo === "Boxe", "Ficha carregada");
+  for (const [nome, animacao] of Object.entries(recursos.dados.android67)) {
+    exigir(animacao.meta.framesReais === animacao.meta.frames, "Quadros disponíveis: " + nome);
+    exigir(animacao.frames.every(({ img }) => img.naturalWidth === 256 && img.naturalHeight === 256), "Dimensões: " + nome);
+  }
+  const indiceAndroid = jogo.escolha.p1;
+  function reset(slot, distancia = 85) {
+    jogo.escolha.p1 = slot === "p1" ? indiceAndroid : 0;
+    jogo.escolha.p2 = slot === "p2" ? indiceAndroid : 0;
+    jogo.projeteis = [];
+    jogo._criarLutadores();
+    jogo.p1.x = 400;
+    jogo.p2.x = 400 + distancia;
+    return [jogo[slot], jogo[slot === "p1" ? "p2" : "p1"]];
+  }
+  function tecla(slot, acao, pressionada = true) {
+    window.dispatchEvent(new KeyboardEvent(pressionada ? "keydown" : "keyup", { code: TECLAS[slot][acao] }));
+  }
+  function apertar(slot, acao) {
+    tecla(slot, acao);
+    tecla(slot, acao, false);
+  }
+  function quadros(n) {
+    for (let i = 0; i < n; i++) {
+      jogo.p1.atualizar(1 / 60, true);
+      jogo.p2.atualizar(1 / 60, true);
+      jogo._resolverColisaoCorpos();
+      jogo._resolverGolpes();
+      jogo._atualizarProjeteis(1 / 60);
+    }
+  }
+  const estados = {
+    esquerda: ESTADOS.WALK, direita: ESTADOS.WALK, pula: ESTADOS.JUMP,
+    agacha: ESTADOS.CROUCH, soco: ESTADOS.PUNCH, chute: ESTADOS.KICK,
+    projetil: ESTADOS.FIREBALL, agarra: ESTADOS.GRAB, especial: ESTADOS.SPECIAL,
+    defende: ESTADOS.BLOCK, provoca: ESTADOS.FLIGHT,
+  };
+  for (const slot of ["p1", "p2"]) {
+    for (const [acao, estado] of Object.entries(estados)) {
+      const [lutador] = reset(slot);
+      exigir(lutador.hp === 90, "Vida inicial " + slot);
+      lutador.especial = CONFIG.especial.custo;
+      tecla(slot, acao);
+      quadros(1);
+      exigir(lutador.estado === estado, slot + " " + acao);
+      tecla(slot, acao, false);
+      quadros(150);
+      exigir(lutador.estado === ESTADOS.IDLE && lutador.y === CHAO_Y, "Recuperação " + slot + " " + acao);
+    }
+    let [lutador, alvo] = reset(slot);
+    apertar(slot, "provoca");
+    quadros(120);
+    exigir(lutador.estado === ESTADOS.FLIGHT && !lutador.noChao, "Voo antes de 2 s " + slot);
+    quadros(1);
+    exigir(lutador.estado === ESTADOS.LAND && lutador.y === CHAO_Y, "Pouso em 2 s " + slot);
+
+    [lutador, alvo] = reset(slot, 300);
+    lutador.especial = CONFIG.especial.custo;
+    apertar(slot, "especial");
+    quadros(18);
+    const laser = jogo.projeteis[0];
+    exigir(laser?.forma === "laser" && laser.facing === lutador.facing, "Laser espelhado " + slot);
+    exigir(alvo.hp === alvo.vidaMax - laser.dano, "Laser causa dano " + slot);
+    quadros(30);
+    exigir(alvo.hp === alvo.vidaMax - laser.dano, "Laser acerta uma vez " + slot);
+
+    [lutador, alvo] = reset(slot, 270);
+    apertar(slot, "projetil");
+    quadros(45);
+    exigir(alvo.hp === alvo.vidaMax - 9, "Pulso Digital " + slot);
+
+    [lutador, alvo] = reset(slot);
+    apertar(slot, "soco");
+    quadros(6);
+    exigir(lutador.janelaCancel > 0 && alvo.hp < alvo.vidaMax, "Jab conecta " + slot);
+    apertar(slot, "soco");
+    quadros(1);
+    exigir(lutador.golpeAtual === "punch_step" && lutador.comboContador === 2, "Combo de boxe " + slot);
+
+    [lutador, alvo] = reset(slot);
+    tecla(alvo.slot, "defende");
+    apertar(slot, "soco");
+    quadros(10);
+    exigir(alvo.hp === alvo.vidaMax, "Guarda alta bloqueia o jab " + slot);
+    quadros(25);
+    apertar(slot, "agarra");
+    quadros(15);
+    exigir(alvo.hp === alvo.vidaMax - 12 && alvo.estado === ESTADOS.KNOCKDOWN, "Agarrão vence a defesa " + slot);
+    tecla(alvo.slot, "defende", false);
+  }
+  document.querySelector("#resultado").textContent = "PASSOU";
+}
+testar().catch((erro) => {
+  document.querySelector("#resultado").textContent = "FALHOU: " + erro.message;
+});
+</script>
+</html>

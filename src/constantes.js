@@ -32,7 +32,7 @@ const TECLAS = {
 };
 
 // Lista de personagens (chaves de sprite no manifest) para a seleção.
-const PERSONAGENS = ["p1", "p2", "p3"];
+const PERSONAGENS = ["p1", "p2", "p3", "serena", "android67", "belyx", "alessander", "carter", "greeg", "morgana"];
 
 /* ===========================================================================
    FICHA DE APRESENTAÇÃO DOS LUTADORES — (1) MÓDULO DE DADOS da seleção.
@@ -53,34 +53,39 @@ const FICHA_PADRAO = {
   estagio: null,
 };
 
-// Cores de tema da seleção (P1 azul elétrico, P2 vermelho sangue + dourado neon).
+// Cores da seleção de lutadores.
 const SELECT_TEMA = {
-  p1: { cor: "#5cd6ff", forte: "#1b6fff", brilho: "#9fe8ff" },
-  p2: { cor: "#ff6a6a", forte: "#c81e2b", brilho: "#ffb0b0" },
-  ouro: "#ffd34d",
-  fundo: "#0a0815",
+  p1: { cor: "#ff4f64", forte: "#711a2e", brilho: "#ffacb8" },
+  p2: { cor: "#59adff", forte: "#16467e", brilho: "#a6ddff" },
+  ouro: "#eccc8c",
 };
 
-/* Células da GRADE de seleção (estilo arcade MK/SF). A grade é fixa em 3×2:
-   3 lutadores jogáveis + 1 slot ALEATÓRIO ("?") + 2 slots BLOQUEADOS (cadeado,
-   "EM BREVE"). tipo ∈ {"pers","random","lock"}. */
 const SELECT_CELULAS = [
-  { tipo: "pers", pers: "p1" },
-  { tipo: "pers", pers: "p2" },
-  { tipo: "pers", pers: "p3" },
+  ...PERSONAGENS.map((pers) => ({ tipo: "pers", pers })),
   { tipo: "random" },
-  { tipo: "lock" },
-  { tipo: "lock" },
 ];
-const SELECT_COLS = 3;
+const SELECT_COLS = Math.min(11, SELECT_CELULAS.length);
 const SELECT_LINHAS = Math.ceil(SELECT_CELULAS.length / SELECT_COLS);
 const TEMPO_SELECT = 30; // segundos até o auto-confirm ("insira ficha")
+
+function retanguloCelulaSelect(indice) {
+  const linha = Math.floor(indice / SELECT_COLS);
+  const quantidade = Math.min(SELECT_COLS, SELECT_CELULAS.length - linha * SELECT_COLS);
+  const gap = SELECT_LINHAS === 1 ? 6 : 5;
+  const h = Math.min(91, Math.floor((95 - gap * (SELECT_LINHAS - 1)) / SELECT_LINHAS));
+  const w = Math.min(h, Math.floor((LARGURA - 32 - gap * (SELECT_COLS - 1)) / SELECT_COLS));
+  const largura = quantidade * w + (quantidade - 1) * gap;
+  return { x: (LARGURA - largura) / 2 + (indice % SELECT_COLS) * (w + gap), y: 416 + linha * (h + gap), w, h };
+}
 
 // Estados possíveis da máquina de estados (um por vez).
 const ESTADOS = {
   IDLE: "idle",
   WALK: "walk",
   JUMP: "jump",
+  LAND: "land",
+  ENTRY: "entry",
+  DEFEAT: "defeat",
   CROUCH: "crouch",
   PUNCH: "punch",
   KICK: "kick",
@@ -94,6 +99,13 @@ const ESTADOS = {
   KO: "ko",
   VICTORY: "victory",
   TAUNT: "taunt",
+  FLIGHT: "flight",
+  TELEPORT: "teleport",
+  SHADOW_GUARD: "shadow_guard",
+  CAPTURED: "captured",
+  SHELL_GUARD: "shell_guard",
+  SHELL_EXIT: "shell_exit",
+  LIGHTNING: "lightning",
   // Defesa de agarrão: ambos cancelam o agarrão simultâneo e ficam presos
   // brevemente nesta pose antes de voltar ao neutro. NÃO é estado livre (input
   // não o sobrescreve) NEM estado de golpe (sem hitbox/janela de cancelamento).

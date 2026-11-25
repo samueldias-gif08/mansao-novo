@@ -1,5 +1,7 @@
 {
   "nome": "Samuel Silva",
+  "pastaSprites": "p1-ilustrado",
+  "spriteLuta": { "escala": 1.2767, "ajusteY": 7.21 },
   "retrato": "silva.png",
   "ficha": {
     "cidade": "IGUAPE — SP",

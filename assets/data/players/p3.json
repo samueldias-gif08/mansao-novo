@@ -1,5 +1,7 @@
 {
   "nome": "Erick Barbosa",
+  "pastaSprites": "p3-ilustrado",
+  "spriteLuta": { "escala": 1.4097, "ajusteY": 15.33 },
   "retrato": "erick.png",
   "ficha": {
     "cidade": "IGUAPE — SP",

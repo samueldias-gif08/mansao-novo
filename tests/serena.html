@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<base href="/">
+<title>Teste de combate de Serena</title>
+<canvas width="960" height="540"></canvas>
+<pre id="resultado">Executando...</pre>
+<script src="../src/config.js"></script>
+<script src="../src/constantes.js"></script>
+<script src="../src/recursos.js"></script>
+<script src="../src/animator.js"></script>
+<script src="../src/controles.js"></script>
+<script src="../src/particulas.js"></script>
+<script src="../src/audio.js"></script>
+<script src="../src/projetil.js"></script>
+<script src="../src/fighter.js"></script>
+<script src="../src/selecao.js"></script>
+<script src="../src/jogo.js"></script>
+<script>
+"use strict";
+async function testar() {
+  const manifest = await carregarManifest();
+  const recursos = new Recursos(manifest);
+  await recursos.precarregar();
+  const jogo = new Jogo(document.querySelector("canvas"), recursos, null, {}, { tocar() {} });
+  const dt = 1 / 60;
+  let verificacoes = 0;
+  function exigir(condicao, mensagem) {
+    if (!condicao) throw new Error(mensagem);
+    verificacoes++;
+  }
+  jogo._iniciarSelect();
+  for (const slot of ["p1", "p2"]) {
+    jogo.select.cursor[slot] = 3;
+    jogo._confirmarSelect(slot);
+    exigir(jogo.confirmado[slot] && jogo.escolha[slot] === 3, "Quarta opção confirmada por " + slot);
+  }
+  jogo._criarLutadores();
+  exigir(jogo.p1.personagem === "serena" && jogo.p2.personagem === "serena", "Seleção inicia Serena contra Serena");
+  exigir(recursos.nome("serena") === "SERENA" && recursos.ficha("serena").estilo === "Capoeira", "Nome e estilo na seleção");
+  exigir(recursos.retrato("serena")?.naturalWidth > 0, "Retrato de Serena carregado");
+  for (const [nome, animacao] of Object.entries(recursos.dados.serena)) {
+    exigir(animacao.meta.framesReais === animacao.meta.frames, "Todos os quadros carregaram: " + nome);
+    exigir(animacao.frames.every(({ img }) => img.naturalWidth === 256 && img.naturalHeight === 256), "Tamanho dos quadros: " + nome);
+  }
+  const sprite = recursos.frame("serena", "idle", 0).img;
+  jogo.ctx.drawImage(sprite, 0, 0);
+  exigir(jogo.ctx.getImageData(0, 0, 1, 1).data[3] === 0, "Sprite tem fundo transparente");
+  jogo.ctx.clearRect(0, 0, 960, 540);
+  jogo.p1.x = 360;
+  jogo.p2.x = 600;
+  jogo.p1.desenhar(jogo.ctx, false);
+  jogo.p2.desenhar(jogo.ctx, false);
+  for (const lutador of [jogo.p1, jogo.p2]) {
+    const torso = jogo.ctx.getImageData(lutador.x - 12, lutador.y - 155, 24, 65).data;
+    exigir(torso.some((valor, i) => i % 4 === 3 && valor > 200), "Sprite renderizado para " + lutador.slot);
+  }
+  function reset(distancia = 85) {
+    jogo.projeteis = [];
+    jogo.p1 = new Fighter(recursos, "p1", "serena", 400, jogo, new ControleTeclado(jogo.entrada, "p1"));
+    jogo.p2 = new Fighter(recursos, "p2", "serena", 400 + distancia, jogo, new ControleTeclado(jogo.entrada, "p2"));
+    jogo.p1.oponente = jogo.p2;
+    jogo.p2.oponente = jogo.p1;
+    jogo.p2.facing = -1;
+  }
+  function tecla(slot, acao, pressionada = true) {
+    const tipo = pressionada ? "keydown" : "keyup";
+    window.dispatchEvent(new KeyboardEvent(tipo, { code: TECLAS[slot][acao] }));
+  }
+  function quadros(n) {
+    for (let i = 0; i < n; i++) {
+      jogo.p1.atualizar(dt, true);
+      jogo.p2.atualizar(dt, true);
+      jogo._resolverColisaoCorpos();
+      jogo._resolverThrowTech();
+      jogo._resolverGolpes();
+      jogo._atualizarProjeteis(dt);
+    }
+  }
+  const estados = {
+    esquerda: ESTADOS.WALK, direita: ESTADOS.WALK, pula: ESTADOS.JUMP,
+    agacha: ESTADOS.CROUCH, soco: ESTADOS.PUNCH, chute: ESTADOS.KICK,
+    projetil: ESTADOS.FIREBALL, agarra: ESTADOS.GRAB, especial: ESTADOS.SPECIAL,
+    defende: ESTADOS.BLOCK, provoca: ESTADOS.TAUNT,
+  };
+  for (const slot of ["p1", "p2"]) {
+    for (const [acao, estado] of Object.entries(estados)) {
+      reset();
+      const lutador = jogo[slot];
+      lutador.especial = CONFIG.especial.custo;
+      tecla(slot, acao);
+      quadros(1);
+      exigir(lutador.estado === estado, slot + " " + acao);
+      tecla(slot, acao, false);
+      quadros(130);
+      exigir(lutador.estado === ESTADOS.IDLE && lutador.y === CHAO_Y, slot + " volta à ginga após " + acao);
+    }
+  }
+  reset(880);
+  tecla("p2", "projetil");
+  tecla("p2", "projetil", false);
+  quadros(14);
+  exigir(jogo.projeteis.length === 0, "Projétil não sai antes do chute");
+  quadros(8);
+  exigir(jogo.projeteis.length === 1 && jogo.projeteis[0].vx < 0, "Projétil único e espelhado");
+  quadros(120);
+  exigir(jogo.p1.hp === 76 && jogo.projeteis.length === 0, "Projétil acerta uma vez");
+
+  reset();
+  tecla("p1", "chute");
+  tecla("p1", "chute", false);
+  quadros(13);
+  exigir(jogo.p2.hp === 76 && jogo.p1.janelaCancel > 0, "Compasso acerta e abre cancelamento");
+  for (const golpe of ["kick_armada", "kick_martelo", "kick_queixada"]) {
+    tecla("p1", "chute");
+    tecla("p1", "chute", false);
+    quadros(1);
+    exigir(jogo.p1.golpeAtual === golpe, "Encadeou " + golpe);
+    quadros(jogo.p1.golpes[golpe].startup + 1);
+  }
+  exigir(jogo.p1.comboContador === 4 && jogo.p2.hp < 63, "Combo finito com dano progressivo");
+  quadros(80);
+  exigir(jogo.p1.comboContador === 0, "Combo zera após recuperar");
+
+  reset(180);
+  tecla("p1", "especial");
+  tecla("p1", "especial", false);
+  quadros(1);
+  exigir(jogo.p1.estado === ESTADOS.IDLE, "Especial exige barra");
+  jogo.p1.especial = CONFIG.especial.custo;
+  tecla("p1", "especial");
+  tecla("p1", "especial", false);
+  quadros(1);
+  exigir(jogo.p1.especial === 0, "Especial consome a barra");
+  quadros(89);
+  exigir(jogo.p2.hp < 65 && jogo.p2.estado === ESTADOS.KNOCKDOWN, "Especial encadeia impactos e derruba");
+  exigir(jogo.projeteis.length === 0 && jogo.p1.especial < CONFIG.especial.custo, "Especial independente do projétil");
+  const ctx = jogo.ctx;
+  jogo.particulas.desenhar(ctx);
+
+  reset();
+  tecla("p2", "defende");
+  tecla("p1", "agarra");
+  tecla("p1", "agarra", false);
+  quadros(20);
+  exigir(jogo.p2.hp === 73 && jogo.p2.estado === ESTADOS.KNOCKDOWN, "Rasteira vence guarda e derruba uma vez");
+  tecla("p2", "defende", false);
+  quadros(120);
+  exigir(jogo.p2.estado === ESTADOS.IDLE && jogo.p2.invencivel <= 0, "Levanta e perde invencibilidade");
+
+  reset();
+  for (const slot of ["p1", "p2"]) {
+    tecla(slot, "agarra");
+    tecla(slot, "agarra", false);
+  }
+  quadros(2);
+  exigir(jogo.p1.estado === ESTADOS.THROW_TECH && jogo.p2.estado === ESTADOS.THROW_TECH, "Agarrões simultâneos se anulam");
+  exigir(jogo.p1.hp === 85 && jogo.p2.hp === 85, "Defesa de agarrão não causa dano");
+
+  reset();
+  tecla("p2", "agacha");
+  tecla("p2", "defende");
+  quadros(1);
+  exigir(jogo.p2.anim.anim === "block_low" && jogo.p2.hurtbox().h === 97, "Guarda baixa usa pose e hurtbox próprias");
+  tecla("p2", "agacha", false);
+  quadros(1);
+  exigir(jogo.p2.anim.anim === "block" && jogo.p2.hurtbox().h === 178, "Guarda alta restaura a hurtbox alta");
+  tecla("p2", "defende", false);
+
+  reset();
+  jogo.p2 = new Fighter(recursos, "p2", "p1", 485, jogo, new ControleIA("medio"));
+  jogo.p1.oponente = jogo.p2;
+  jogo.p2.oponente = jogo.p1;
+  exigir(jogo.p2.hp === 100 && jogo.p2.hurtbox().h === 186, "Lutador existente mantém vida e hurtbox");
+  exigir(jogo._vencedorPorVida() === "empate", "Lutadores com vida cheia empatam no tempo");
+  quadros(45);
+  exigir(jogo.p2.y <= CHAO_Y, "Controle de IA atualiza com Serena como adversária");
+  document.getElementById("resultado").textContent = "PASS " + verificacoes + " verificações";
+}
+testar().catch((erro) => {
+  document.getElementById("resultado").textContent = "FAIL " + erro.message;
+});
+</script>
+</html>

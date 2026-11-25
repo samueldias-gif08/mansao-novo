@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<base href="/">
+<title>Teste da Alessander</title>
+<canvas width="960" height="540"></canvas>
+<pre id="resultado">Executando…</pre>
+<script src="src/config.js"></script>
+<script src="src/constantes.js"></script>
+<script src="src/recursos.js"></script>
+<script src="src/animator.js"></script>
+<script src="src/controles.js"></script>
+<script src="src/particulas.js"></script>
+<script src="src/audio.js"></script>
+<script src="src/projetil.js"></script>
+<script src="src/fighter.js"></script>
+<script src="src/selecao.js"></script>
+<script src="src/jogo.js"></script>
+<script>
+"use strict";
+async function testar() {
+  const recursos = new Recursos(await carregarManifest());
+  await recursos.precarregar();
+  const jogo = new Jogo(document.querySelector("canvas"), recursos, null, {}, { tocar() {} });
+  function exigir(condicao, mensagem) {
+    if (!condicao) throw new Error(mensagem);
+  }
+  jogo._iniciarSelect();
+  const indice = SELECT_CELULAS.findIndex((celula) => celula.pers === "alessander");
+  for (const slot of ["p1", "p2"]) {
+    const { x, y, w, h } = jogo._retCelulaSelect(indice);
+    const area = jogo.canvas.getBoundingClientRect();
+    jogo.canvas.dispatchEvent(new MouseEvent("click", {
+      clientX: area.left + (x + w / 2) * area.width / LARGURA,
+      clientY: area.top + (y + h / 2) * area.height / ALTURA,
+    }));
+    exigir(jogo.confirmado[slot] && PERSONAGENS[jogo.escolha[slot]] === "alessander", "Seleção por clique " + slot);
+  }
+  exigir(recursos.retrato("alessander")?.naturalWidth > 0, "Retrato carregado");
+  exigir(recursos.ficha("alessander").estilo === "MMA", "Ficha carregada");
+  for (const [nome, animacao] of Object.entries(recursos.dados.alessander)) {
+    exigir(animacao.meta.framesReais === animacao.meta.frames, "Quadros disponíveis: " + nome);
+    exigir(animacao.frames.every(({ img }) => img.naturalWidth === 256 && img.naturalHeight === 256), "Dimensões: " + nome);
+  }
+  const indiceAlessander = jogo.escolha.p1;
+  function reset(slot, distancia = 85) {
+    jogo.escolha.p1 = slot === "p1" ? indiceAlessander : 0;
+    jogo.escolha.p2 = slot === "p2" ? indiceAlessander : 0;
+    jogo.projeteis = [];
+    jogo._criarLutadores();
+    jogo.p1.x = 400;
+    jogo.p2.x = 400 + distancia;
+    return [jogo[slot], jogo[slot === "p1" ? "p2" : "p1"]];
+  }
+  function tecla(slot, acao, pressionada = true) {
+    window.dispatchEvent(new KeyboardEvent(pressionada ? "keydown" : "keyup", { code: TECLAS[slot][acao] }));
+  }
+  function apertar(slot, acao) {
+    tecla(slot, acao);
+    tecla(slot, acao, false);
+  }
+  function quadros(n) {
+    for (let i = 0; i < n; i++) {
+      jogo.p1.atualizar(1 / 60, true);
+      jogo.p2.atualizar(1 / 60, true);
+      jogo._resolverColisaoCorpos();
+      jogo._resolverGolpes();
+      jogo._atualizarProjeteis(1 / 60);
+    }
+  }
+  const estados = {
+    esquerda: ESTADOS.WALK, direita: ESTADOS.WALK, pula: ESTADOS.JUMP,
+    agacha: ESTADOS.CROUCH, soco: ESTADOS.PUNCH, chute: ESTADOS.KICK,
+    projetil: ESTADOS.FIREBALL, agarra: ESTADOS.GRAB, especial: ESTADOS.SPECIAL,
+    defende: ESTADOS.BLOCK, provoca: ESTADOS.FIREBALL,
+  };
+  const [sprite] = reset("p1");
+  const ctx = jogo.ctx;
+  function desenharLado(facing) {
+    ctx.clearRect(0, 0, LARGURA, ALTURA);
+    sprite.facing = facing;
+    sprite.desenhar(ctx, false);
+    return ctx.getImageData(sprite.x - 128, sprite.y - 256, 256, 220).data;
+  }
+  const direita = desenharLado(1);
+  const esquerda = desenharLado(-1);
+  let opacos = 0;
+  let espelhados = 0;
+  for (let y = 0; y < 220; y++) {
+    for (let x = 0; x < 256; x++) {
+      if (direita[(y * 256 + x) * 4 + 3] < 180) continue;
+      opacos++;
+      if (esquerda[(y * 256 + 255 - x) * 4 + 3] >= 180) espelhados++;
+    }
+  }
+  exigir(opacos > 2000 && espelhados / opacos > 0.98, "Sprite desenhado nos dois sentidos");
+  for (const slot of ["p1", "p2"]) {
+    for (const [acao, estado] of Object.entries(estados)) {
+      const [lutador] = reset(slot);
+      exigir(lutador.hp === 92, "Vida inicial " + slot);
+      lutador.especial = CONFIG.especial.custo;
+      tecla(slot, acao);
+      quadros(1);
+      exigir(lutador.estado === estado, slot + " " + acao);
+      if (acao === "provoca") exigir(lutador.anim.anim === "sonic", "Anima??o s?nica " + slot);
+      tecla(slot, acao, false);
+      quadros(150);
+      exigir(lutador.estado === ESTADOS.IDLE && lutador.y === CHAO_Y, "Recuperação " + slot + " " + acao);
+    }
+    let [lutador, alvo] = reset(slot, 150);
+    const origem = lutador.x;
+    const lado = lutador.facing;
+    apertar(slot, "especial");
+    quadros(1);
+    exigir(lutador.estado === ESTADOS.IDLE, "Tornado exige barra " + slot);
+    lutador.especial = CONFIG.especial.custo;
+    apertar(slot, "especial");
+    quadros(1);
+    exigir(lutador.especial === 0 && lutador.anim.anim === "special", "Tornado consome a barra " + slot);
+    quadros(13);
+    exigir(alvo.hp === alvo.vidaMax - 7, "Primeiro impacto " + slot);
+    quadros(16);
+    exigir(Math.sign(lutador.x - origem) === lado && lutador.noChao, "Avan?o espelhado no ch?o " + slot);
+    exigir(alvo.hp < alvo.vidaMax - 7 && alvo.estado === ESTADOS.KNOCKDOWN, "Final do tornado derruba " + slot);
+    exigir(jogo.projeteis.length === 0, "Tornado corporal " + slot);
+
+    [lutador, alvo] = reset(slot, 270);
+    apertar(slot, "provoca");
+    quadros(15);
+    exigir(jogo.projeteis[0]?.forma === "onda-sonica" && jogo.projeteis[0].facing === lutador.facing,
+      "Onda espelhada " + slot);
+    quadros(40);
+    exigir(alvo.hp === alvo.vidaMax - 12, "Rugido S?nico causa dano uma vez " + slot);
+    apertar(slot, "provoca");
+    quadros(1);
+    exigir(lutador.estado === ESTADOS.IDLE, "Recarga s?nica " + slot);
+
+    [lutador, alvo] = reset(slot, 270);
+    apertar(slot, "projetil");
+    quadros(45);
+    exigir(alvo.hp === alvo.vidaMax - 9, "Pulso de Impacto " + slot);
+
+    [lutador, alvo] = reset(slot, 74);
+    apertar(slot, "soco");
+    quadros(6);
+    exigir(lutador.janelaCancel > 0 && alvo.hp < alvo.vidaMax, "Jab conecta " + slot);
+    apertar(slot, "soco");
+    quadros(7);
+    exigir(lutador.golpeAtual === "punch_step" && lutador.janelaCancel > 0, "Direto conecta " + slot);
+    apertar(slot, "soco");
+    quadros(6);
+    exigir(lutador.golpeAtual === "punch_elbow" && lutador.janelaCancel > 0, "Cotovelo conecta " + slot);
+    apertar(slot, "chute");
+    quadros(7);
+    exigir(lutador.golpeAtual === "kick_knee" && lutador.comboContador === 4, "Encadeia a joelhada " + slot);
+
+    [lutador, alvo] = reset(slot);
+    tecla(alvo.slot, "defende");
+    apertar(slot, "soco");
+    quadros(10);
+    exigir(alvo.hp === alvo.vidaMax, "Guarda alta bloqueia o jab " + slot);
+    quadros(25);
+    apertar(slot, "agarra");
+    quadros(16);
+    exigir(alvo.hp === alvo.vidaMax - 14 && alvo.estado === ESTADOS.KNOCKDOWN, "Clinch Brutal " + slot);
+    tecla(alvo.slot, "defende", false);
+
+  }
+  jogo.modo = "1p";
+  const aleatorio = Math.random;
+  try {
+    Math.random = () => 0;
+    const [cpu] = reset("p2", 180);
+    quadros(1);
+    exigir(cpu.golpeAtual === "sonic", "CPU usa o Rugido Sônico");
+    const [cpuPerto] = reset("p2", 75);
+    cpuPerto.especial = CONFIG.especial.custo;
+    quadros(1);
+    exigir(cpuPerto.estado === ESTADOS.SPECIAL, "CPU usa o Tornado de perto");
+  } finally {
+    Math.random = aleatorio;
+  }
+  document.querySelector("#resultado").textContent = "PASSOU";
+}
+testar().catch((erro) => {
+  document.querySelector("#resultado").textContent = "FALHOU: " + erro.message;
+});
+</script>
+</html>

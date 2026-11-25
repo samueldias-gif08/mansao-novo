@@ -181,7 +181,8 @@ class ControleIA {
           Math.abs(p.x - f.x) < 230 &&
           Math.random() < this.cfg.pulaProjetil * dt * 8
         ) {
-          this.segura.add("pula");
+          if (f.perfil.voo && f.noChao && f.podeAgir()) this.fila.push("provoca");
+          else this.segura.add("pula");
         }
       }
     }
@@ -213,9 +214,29 @@ class ControleIA {
   _decidir(f, op, ad, dirOp) {
     const c = this.cfg;
     const opAtacando = ESTADOS_GOLPE.has(op.estado);
-    const barraCheia = f.especial >= CONFIG.especial.custo;
+    const especialPronto = f.podeUsarEspecial();
     // Reavalia o mixup baixo a cada decisão (não fica agachado indefinidamente).
     this.queroBaixo = false;
+
+    if (f.perfil.defesaCasco && especialPronto && f.noChao && f.podeAgir() &&
+      opAtacando && ad < c.alcanceAtaque + 25 && Math.random() < c.blockChance) {
+      this.fila.push("especial");
+      this.plano = "esperar";
+      return;
+    }
+
+    if (f.noChao && f.podeAgir() && f.perfil.defesaSombria &&
+      f.recargaSombra <= 0 && opAtacando && ad < c.alcanceAtaque && Math.random() < c.blockChance) {
+      this.fila.push("provoca");
+      this.plano = "esperar";
+      return;
+    }
+    if (f.noChao && f.podeAgir() && f.perfil.teleporte && f.recargaTeleporte <= 0 &&
+      ad > c.alcanceAtaque && ad < c.alcanceMedio && Math.random() < c.projChance * 0.5) {
+      this.fila.push("especial");
+      this.plano = "esperar";
+      return;
+    }
 
     // Defender se o oponente ataca de perto (reação).
     if (
@@ -231,9 +252,10 @@ class ControleIA {
       // No alcance: atacar conforme agressividade.
       if (Math.random() < c.agressao) {
         const r = Math.random();
-        if (barraCheia && r < 0.18) this.fila.push("especial");
+        if (especialPronto && !f.perfil.defesaCasco && r < 0.18) this.fila.push("especial");
         else if (r < 0.32) this.fila.push("agarra");
         else if (r < 0.5) this.queroBaixo = true; // soco baixo (mixup)
+        else if (f.perfil.vooPermanente && r < 0.58) this.fila.push("provoca");
         else if (r < 0.74) this.fila.push("soco");
         else this.fila.push("chute");
         this.plano = "aproximar";
@@ -243,7 +265,11 @@ class ControleIA {
     } else if (ad < c.alcanceMedio) {
       // Zona média: aproximar ou soltar projétil.
       if (Math.random() < c.projChance) {
-        this.fila.push("projetil");
+        const temLaser = f.perfil.projetil?.super?.forma === "laser";
+        const usarOnda = f.noChao && ((f.perfil.ondaSonica && f.recargaSonica <= 0) ||
+          (f.perfil.invocacaoRaios && f.recargaRaios <= 0));
+        const ataque = temLaser && especialPronto && f.noChao ? "especial" : usarOnda ? "provoca" : "projetil";
+        this.fila.push(ataque);
         this.plano = "esperar";
       } else this.plano = "aproximar";
     } else {

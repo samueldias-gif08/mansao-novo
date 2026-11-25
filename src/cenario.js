@@ -116,6 +116,7 @@ class Cenario {
     this.npcsFundo = [];
     this.npcsFrente = [];
     this.imagemUnica = null; // usada quando não há camadas declaradas
+    this.escalaFundo = mapa?.full ? (mapa.escalaFundo ?? 1) : 1;
 
     // Camadas: se o mapa declara uma pilha, usa-a; senão, imagem única (compat).
     if (mapa && Array.isArray(mapa.camadas) && mapa.camadas.length) {
@@ -149,12 +150,35 @@ class Cenario {
     if (this.camadasFundo.length) {
       for (const c of this.camadasFundo) c.desenhar(ctx, cameraX);
     } else if (this.imagemUnica) {
-      // A imagem é esticada para ocupar o mundo inteiro (MUNDO_L x ALTURA).
-      ctx.drawImage(this.imagemUnica, 0, 0, MUNDO_L, ALTURA);
+      this._desenharImagemUnica(ctx, cameraX);
     } else {
       Cenario.desenharProcedural(ctx);
     }
     for (const n of this.npcsFundo) n.desenhar(ctx, cameraX);
+  }
+
+  _desenharImagemUnica(ctx, cameraX) {
+    const imagem = this.imagemUnica;
+    const escala = Math.max(0.5, LARGURA / MUNDO_L, Math.min(1, this.escalaFundo));
+    if (escala === 1) {
+      ctx.drawImage(imagem, 0, 0, MUNDO_L, ALTURA);
+      return;
+    }
+
+    const largura = MUNDO_L * escala;
+    const altura = ALTURA * escala;
+    const topo = ALTURA - altura;
+    // A câmera percorre a arte reduzida sem expor as bordas laterais.
+    const x = Math.round(cameraX) - cameraX * (largura - LARGURA) / (MUNDO_L - LARGURA);
+    ctx.drawImage(imagem, x, topo, largura, altura);
+
+    // Estende o topo da arte para manter o piso na base da tela.
+    ctx.save();
+    ctx.translate(x, topo);
+    ctx.scale(1, -1);
+    ctx.drawImage(imagem, 0, 0, imagem.width, imagem.height * topo / altura,
+      0, 0, largura, topo);
+    ctx.restore();
   }
 
   // FRENTE — NPCs e camadas que passam NA FRENTE dos lutadores (parallax > 1).

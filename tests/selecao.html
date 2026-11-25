@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<title>Teste da seleção cinematográfica</title>
+<style>iframe { display: block; border: 0; width: 960px; height: 540px; }</style>
+<pre id="resultado">Executando...</pre>
+<script>
+  function exigir(condicao, mensagem) {
+    if (!condicao) throw new Error(mensagem);
+  }
+  async function testar() {
+    const fonte = (await (await fetch("../index.html")).text())
+      .replace("<head>", '<head><base href="../">')
+      .replace('<script src="src/main.js"><\/script>', "");
+    const iframe = document.createElement("iframe");
+    iframe.allowFullscreen = true;
+    const carregou = new Promise((resolve) => iframe.addEventListener("load", resolve, { once: true }));
+    iframe.srcdoc = fonte;
+    document.body.append(iframe);
+    await carregou;
+    const janela = iframe.contentWindow;
+    const criar = janela.Function(`
+      return (async () => {
+        const recursos = new Recursos(await carregarManifest());
+        await recursos.precarregar();
+        const mapa = { nome: "Arena", full: recursos.mapa };
+        const sons = [];
+        const jogo = new Jogo(document.querySelector("#tela"), recursos, { mapas: [mapa] },
+          { tocar() {} }, { tocar: (som) => sons.push(som) });
+        return { jogo, mapa, recursos, sons, ROSTER: PERSONAGENS, SELECT_CELULAS, TELAS, VS_TIMING };
+      })();
+    `);
+    const { jogo, mapa, recursos, sons, ROSTER, SELECT_CELULAS, TELAS, VS_TIMING } = await criar();
+    for (const pers of ROSTER) {
+      const { principal, retrato } = recursos.artesSelecao[pers];
+      exigir(principal?.height >= 1080 && principal.width >= 720, "Arte principal " + pers);
+      exigir(retrato?.width === retrato?.height && retrato.width >= 256, "Retrato quadrado " + pers);
+    }
+    const tecla = (codigo) => janela.dispatchEvent(new janela.KeyboardEvent("keydown", { code: codigo }));
+    const quadro = (dt = 1 / 60) => {
+      jogo._atualizarSelect(dt);
+      jogo.entrada.bordas.length = 0;
+      jogo.entrada.confirmar = jogo.entrada.voltar = false;
+    };
+    function apontar(i, classe, tipo) {
+      const { x, y, w, h } = jogo._retCelulaSelect(i);
+      const area = jogo.canvas.getBoundingClientRect();
+      jogo.canvas.dispatchEvent(new janela[classe](tipo, {
+        pointerType: "mouse", button: 0,
+        clientX: area.left + (x + w / 2) * area.width / 960,
+        clientY: area.top + (y + h / 2) * area.height / 540,
+      }));
+    }
+    const clicar = (i) => apontar(i, "MouseEvent", "click");
+    jogo._iniciarSelect();
+    tecla("KeyD");
+    tecla("ArrowLeft");
+    quadro();
+    exigir(jogo.select.cursor.p1 === 1 && jogo.select.cursor.p2 === 0, "Navegação simultânea");
+    exigir(jogo.select.prevCursor.p1 === 0 && jogo.select.trans.p1 === 0, "Animação conserva arte anterior");
+    quadro(0.15);
+    exigir(jogo.select.trans.p1 > 0 && jogo.select.trans.p1 < 1, "Dissolução em andamento");
+    for (let i = 0; i < ROSTER.length; i++) {
+      jogo._iniciarSelect();
+      clicar(i);
+      clicar(i);
+      exigir(jogo.confirmado.p1 && jogo.confirmado.p2 && jogo.escolha.p1 === i && jogo.escolha.p2 === i, "Escolha dupla " + ROSTER[i]);
+      quadro();
+      exigir(jogo.select.saindo > 0, "Confronto após confirmar");
+      jogo._desenharSelect(jogo.ctx);
+      tecla("Escape");
+      quadro();
+      exigir(jogo.tela === TELAS.SELECT && !jogo.confirmado.p1 && !jogo.confirmado.p2 && !jogo.select.saindo, "Cancelar confirmação");
+    }
+    jogo._iniciarSelect();
+    apontar(4, "PointerEvent", "pointermove");
+    exigir(jogo.select.cursor.p1 === 4 && !jogo.confirmado.p1, "Preview pelo mouse");
+    clicar(4);
+    apontar(7, "PointerEvent", "pointermove");
+    exigir(jogo.select.cursor.p1 === 4 && jogo.select.cursor.p2 === 7, "Cursor do mouse não altera P1 confirmado");
+    clicar(SELECT_CELULAS.length - 1);
+    exigir(jogo.confirmado.p2 && ROSTER[jogo.escolha.p2], "Escolha aleatória");
+    quadro();
+    quadro(0.9);
+    exigir(jogo.tela === TELAS.MAPA, "Confirmação segue ao mapa");
+    jogo._confirmarMapa(jogo.selecaoMapa.resolverEscolha());
+    exigir(jogo.tela === TELAS.VS && jogo.mapaEscolhido === mapa && jogo.p1.personagem === ROSTER[4], "Mapa mantém a escolha");
+    const { entrada, confronto, round, flash } = VS_TIMING;
+    jogo._atualizarVS(entrada + confronto + round + flash + 1);
+    exigir(jogo.tela === TELAS.LUTA && jogo.p2.personagem === ROSTER[jogo.escolha.p2], "VS chega à luta");
+    exigir(sons.includes("personagem") && sons.includes("selecionar"), "Sons");
+
+    const medidas = [];
+    for (const [w, h] of [[640, 480], [1920, 1080], [3840, 2160]]) {
+      iframe.style.width = w + "px";
+      iframe.style.height = h + "px";
+      jogo._iniciarSelect();
+      jogo._ajustarCanvasSelecao();
+      exigir(Math.abs(jogo.canvas.width / jogo.canvas.height - 16 / 9) < 0.003, "Proporção " + w);
+      exigir(w < 1920 || jogo.canvas.width > 960, "Render em alta resolução " + w);
+      const area = jogo.canvas.getBoundingClientRect();
+      exigir(area.width <= w && area.height <= h, "Moldura responsiva " + w);
+      jogo._desenharSelect(jogo.ctx);
+      jogo.ctx.getImageData(0, 0, 1, 1);
+      const inicio = performance.now();
+      for (let i = 0; i < 5; i++) jogo._desenharSelect(jogo.ctx);
+      jogo.ctx.getImageData(0, 0, 1, 1);
+      medidas.push(Math.round((performance.now() - inicio) / 5 * 10) / 10);
+      clicar(7);
+      exigir(ROSTER[jogo.escolha.p1] === "carter", "Clique responsivo " + w);
+      if (w === 3840) {
+        const larguraOriginal = jogo.canvas.width;
+        for (let i = 0; i < 6; i++) jogo._ajustarCanvasSelecao(0.06);
+        exigir(jogo.canvas.width < larguraOriginal && jogo.canvas.getBoundingClientRect().width === area.width,
+          "Resolução adaptativa conserva área de exibição em 4K");
+        jogo.tela = TELAS.MAPA;
+        jogo._ajustarCanvasSelecao();
+        exigir(jogo.canvas.width === 960, "Arena restaura resolução nativa");
+      }
+    }
+    iframe.style.width = "1280px";
+    iframe.style.height = "720px";
+    jogo._iniciarSelect();
+    jogo.select.intro = 0;
+    jogo.select.cursor = { p1: 7, p2: 9 };
+    jogo._ajustarCanvasSelecao();
+    jogo._desenharSelect(jogo.ctx);
+    window.validarTelaCheia = async () => {
+      await iframe.requestFullscreen();
+      exigir(document.fullscreenElement === iframe, "Fullscreen real");
+      jogo._ajustarCanvasSelecao();
+      clicar(7);
+      exigir(ROSTER[jogo.escolha.p1] === "carter" && jogo.confirmado.p1, "Clique em tela cheia");
+      await document.exitFullscreen();
+      jogo._iniciarSelect();
+      jogo.select.intro = 0;
+      jogo.select.cursor = { p1: 7, p2: 9 };
+      jogo._ajustarCanvasSelecao();
+      jogo._desenharSelect(jogo.ctx);
+      return true;
+    };
+    resultado.textContent = "PASSOU " + JSON.stringify(medidas);
+  }
+  testar().catch((erro) => { resultado.textContent = "FALHOU: " + erro.message; });
+</script>
+</html>

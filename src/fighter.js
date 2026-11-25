@@ -42,22 +42,36 @@ class Fighter {
     this.nome = recursos.nome(personagem);
     // Frame data PRÓPRIO deste lutador (vem do manifest; default = CONFIG.golpes).
     this.golpes = montarGolpes(recursos.golpes(personagem));
+    this.perfil = recursos.manifest.players[personagem]?.combate || {};
 
     this.x = x;
-    this.y = CHAO_Y;
+    this.y = CHAO_Y - (this.perfil.vooPermanente?.altura || 0);
     this.vx = 0;
     this.vy = 0;
     this.facing = 1;
-    this.noChao = true;
+    this.noChao = !this.perfil.vooPermanente;
+    this.tempoVoo = 0;
+    this.nivelVoo = 0;
+    this.velVoo = 0;
+    this.patrulha = null;
 
-    this.hp = VIDA_MAX;
+    this.vidaMax = this.perfil.vida ?? VIDA_MAX;
+    this.hp = this.vidaMax;
     this.especial = 0; // barra de especial (0..CONFIG.especial.max)
     this.estado = ESTADOS.IDLE;
     this.estadoTempo = 0;
+    this.recargaSombra = 0;
+    this.recargaTeleporte = 0;
+    this.recargaSonica = 0;
+    this.recargaPatrulha = 0;
+    this.recargaCasco = 0;
+    this.recargaVento = 0;
+    this.recargaRaios = 0;
+    this.raios = [];
     this.anim = new Animator(recursos, personagem);
     this.anim.tocar("idle");
 
-    this.golpeAcertou = false;
+    this.ultimoImpacto = null;
     this.projetilLancado = false;
     this.golpeAtual = null;
     this.oponente = null;
@@ -99,8 +113,28 @@ class Fighter {
     return this.estado !== ESTADOS.KO;
   }
 
+  get cargaEspecialHUD() {
+    const vento = this.perfil.especial?.recargaVento;
+    if (vento) return CONFIG.especial.max * (1 - this.recargaVento / vento);
+    const casco = this.perfil.defesaCasco;
+    if (casco) return CONFIG.especial.max * Math.max(0, 1 - this.recargaCasco / casco.recarga);
+    const recarga = this.perfil.especial?.recarga;
+    if (!recarga) return this.especial;
+    return CONFIG.especial.max * (1 - this.recargaPatrulha / recarga);
+  }
+
+  podeUsarEspecial() {
+    return this.cargaEspecialHUD >= CONFIG.especial.custo;
+  }
+
   hurtbox() {
-    const agachado = this.estado === ESTADOS.CROUCH;
+    const agachado = this.estado === ESTADOS.CROUCH ||
+      (this.perfil.hurtboxes && this.estado === ESTADOS.BLOCK && this.estaDefendendoBaixo);
+    const caixa = this.perfil.hurtboxes?.[agachado ? "baixa" : "normal"];
+    if (caixa) {
+      const [largura, altura] = caixa;
+      return { x: this.x - largura / 2, y: this.y - altura, w: largura, h: altura };
+    }
     const meiaL = agachado ? 44 : 38;
     const topo = agachado ? -112 : -186;
     const alt = agachado ? 112 : 186;
@@ -154,10 +188,23 @@ class Fighter {
     return frames60 >= 5 && frames60 < 10;
   }
 
-  hitbox() {
-    if (!this.golpeAtual || !this.golpes[this.golpeAtual]) return null;
-    if (!this._golpeAtivo()) return null;
-    const g = this.golpes[this.golpeAtual];
+  golpeCorporalAtivo() {
+    const impactos = this.golpeAtual === "super"
+      ? this.perfil.especial?.impactos : this.golpes[this.golpeAtual]?.impactos;
+    if (impactos) {
+      return impactos.find((g) => {
+        const quadro = this.estadoTempo * 60;
+        return quadro >= g.startup && quadro < g.startup + g.ativo;
+      }) || null;
+    }
+    if (this.golpeAtual === "super") return null;
+    if (!this.golpeAtual || !this._golpeAtivo()) return null;
+    return this.estado === ESTADOS.FIREBALL && this.perfil.projetil
+      ? null : this.golpes[this.golpeAtual];
+  }
+
+  hitbox(g = this.golpeCorporalAtivo()) {
+    if (!g) return null;
     let x1, x2;
     if (this.facing === 1) {
       x1 = this.x + g.alcance[0];
@@ -180,8 +227,15 @@ class Fighter {
   irPara(estado, forcar = false, golpe = null) {
     if (this.estado === estado && !forcar) return;
     this.estado = estado;
+    if (estado !== ESTADOS.LIGHTNING) this.raios.length = 0;
+    if (estado !== ESTADOS.CAPTURED) this.anguloCaptura = 0;
+    if (estado !== ESTADOS.SPECIAL) this.patrulha = null;
+    if (this.perfil.vooPermanente && (estado === ESTADOS.ENTRY || estado === ESTADOS.VICTORY)) {
+      this.origemPoseVoo = this.x;
+    }
+    if (estado === ESTADOS.ENTRY && this.perfil.entradaAndando) this.origemEntrada = this.x;
     this.estadoTempo = 0;
-    this.golpeAcertou = false;
+    this.ultimoImpacto = null;
     this.projetilLancado = false;
     this.golpeAtual = golpe;
     this.janelaCancel = 0;
@@ -194,16 +248,23 @@ class Fighter {
     const fb = (nome, alt) => (r.tem(this.personagem, nome) ? nome : alt);
     switch (estado) {
       case ESTADOS.IDLE:
-        return "idle";
+        return this.perfil.repousoBracos && this.estadoTempo >= this.perfil.repousoBracos
+          ? fb("idle_arms", "idle") : "idle";
       case ESTADOS.WALK:
+        if (this.perfil.caminhada && this._avancando()) {
+          return this.estadoTempo < this.perfil.caminhada ? fb("walk_forward", "walk") : fb("run", "walk");
+        }
         return this._avancando() ? fb("run", "walk") : "walk";
       case ESTADOS.JUMP:
-        return fb("run", "idle");
+        if (this.perfil.vooPermanente) return "jump";
+        return this.vy > 0 ? fb("fall", fb("run", "idle")) : fb("jump", fb("run", "idle"));
       case ESTADOS.CROUCH:
-        return fb("item", "idle");
+        return fb("crouch", fb("item", "idle"));
       case ESTADOS.BLOCK:
+        if (this.estaDefendendoBaixo && r.tem(this.personagem, "block_low")) return "block_low";
         return fb("block", "idle");
       case ESTADOS.HIT:
+      case ESTADOS.CAPTURED:
         return fb("hit", "idle");
       case ESTADOS.KNOCKDOWN:
         return fb("knockdown", "hit");
@@ -212,9 +273,17 @@ class Fighter {
       case ESTADOS.KO:
         return fb("ko", "knockdown");
       case ESTADOS.VICTORY:
-        return fb("taunt", "idle");
+        return fb("victory", fb("taunt", "idle"));
       case ESTADOS.TAUNT:
         return fb("taunt", "idle");
+      case ESTADOS.FLIGHT:
+        return fb("flight", "jump");
+      case ESTADOS.TELEPORT:
+      case ESTADOS.SHADOW_GUARD:
+      case ESTADOS.SHELL_GUARD:
+      case ESTADOS.SHELL_EXIT:
+      case ESTADOS.LIGHTNING:
+        return fb(estado, "block");
       case ESTADOS.PUNCH: {
         // Variantes do soco (punch_step, soco_baixo, ...) usam o sprite de
         // mesmo nome se existir; senão reaproveitam "punch". Assim um golpe
@@ -238,7 +307,11 @@ class Fighter {
       case ESTADOS.FIREBALL:
         return this.golpeAtual || "fireball";
       case ESTADOS.GRAB:
-        return fb("item", "punch"); // agarrão usa "item"
+        return fb("grab", fb("item", "punch"));
+      case ESTADOS.ENTRY:
+      case ESTADOS.LAND:
+      case ESTADOS.DEFEAT:
+        return fb(estado, "idle");
       case ESTADOS.SPECIAL:
         return fb("special", "item"); // especial usa "special"/"item"
       default:
@@ -261,8 +334,15 @@ class Fighter {
   // quanto a animação saem dele, então um novo golpe baixo é só uma entrada
   // a mais em CONFIG.golpes/manifest — sem tocar nesta função.
   iniciarSoco(movendo, agachado) {
+    if (this.perfil.socoTriplo) {
+      this.irPara(ESTADOS.PUNCH, true, "punch_triple");
+      return;
+    }
     let golpe = "punch";
+    const sequencia = this.perfil.socos;
     if (agachado && this.golpes["soco_baixo"]) golpe = "soco_baixo";
+    else if (sequencia?.length && this.comboContador > 1)
+      golpe = sequencia[Math.min(this.comboContador - 1, sequencia.length - 1)];
     else if (movendo && this.recursos.tem(this.personagem, "punch_step"))
       golpe = "punch_step";
     this.irPara(ESTADOS.PUNCH, true, golpe);
@@ -270,10 +350,18 @@ class Fighter {
 
   iniciarChute(agachado, noAr) {
     let anim = "kick";
-    if (noAr && this.recursos.tem(this.personagem, "kick_jump"))
+    if (noAr && this.perfil.chuteAereoGiro && (this.comboContador > 1 || this._avancando()))
+      anim = this.perfil.chuteAereoGiro;
+    else if (noAr && this.recursos.tem(this.personagem, "kick_jump"))
       anim = "kick_jump";
     else if (agachado && this.recursos.tem(this.personagem, "kick_mid"))
       anim = "kick_mid";
+    else if (this.perfil.chutes) {
+      const chutes = this.perfil.chutes;
+      const chuteCombo = this.comboContador > 1 ? this.perfil.chuteCombo : null;
+      const chuteAvanco = this._avancando() ? this.perfil.chuteAvanco : null;
+      anim = chuteCombo || chuteAvanco || chutes[Math.max(0, this.comboContador - 1) % chutes.length];
+    }
     // Personagem sem o sprite "kick" em pé (ex.: p3/Erick): usa o avanço "lunge"
     // como chute padrão; sem isso o estado KICK travaria (meta nulo nunca termina).
     if (!this.recursos.tem(this.personagem, anim)) {
@@ -285,7 +373,7 @@ class Fighter {
 
   iniciarProjetil(agachado) {
     let anim = "fireball";
-    if (agachado && this.recursos.tem(this.personagem, "special"))
+    if (!this.perfil.projetil && agachado && this.recursos.tem(this.personagem, "special"))
       anim = "special";
     if (!this.recursos.tem(this.personagem, anim)) anim = "fireball";
     this.irPara(ESTADOS.FIREBALL, true, anim);
@@ -294,7 +382,8 @@ class Fighter {
   // NOVO: agarrão (usa pose "item"; ignora defesa; derruba).
   iniciarAgarra() {
     this.irPara(ESTADOS.GRAB, true, "agarra");
-    this.jogo.audio.chute();
+    this.vx += (this.perfil.avancoAgarrar || 0) * this.facing;
+    this._somChute();
   }
 
   // THROW TECH: agarrão cancelado por agarrão simultâneo do oponente. Nenhum
@@ -311,9 +400,94 @@ class Fighter {
 
   // NOVO: especial (gasta a barra cheia; lança o super-projétil na pose "special").
   iniciarEspecial() {
-    this.especial = 0;
+    const casco = this.perfil.defesaCasco;
+    if (casco) {
+      if (!this.noChao || !this.podeUsarEspecial()) return;
+      this.vx = 0;
+      this.vy = 0;
+      this.recargaCasco = casco.duracao + casco.recarga;
+      this.irPara(ESTADOS.SHELL_GUARD, true);
+      this.jogo.audio.bloqueio();
+      return;
+    }
+    if (this.perfil.especial?.efeito === "bumerangue") {
+      if (!this.podeUsarEspecial()) return;
+      const { distancia, recarga } = this.perfil.especial;
+      const alvoX = this.oponente?.x ?? this.x;
+      const alcance = Math.min(distancia, Math.max(175, Math.abs(alvoX - this.x) + 118));
+      this.patrulha = {
+        origemX: this.x,
+        origemY: this.y,
+        destino: Math.max(40, Math.min(MUNDO_L - 40, this.x + this.facing * alcance)),
+        lado: this.facing,
+      };
+      this.vx = 0;
+      this.vy = 0;
+      this.recargaPatrulha = recarga;
+      this.irPara(ESTADOS.SPECIAL, true, "super");
+      this.jogo.audio.especial();
+      return;
+    }
+    if (this.perfil.especial && (!this.podeUsarEspecial() || !this.noChao)) return;
+    const vento = this.perfil.especial?.recargaVento;
+    if (vento) {
+      this.recargaVento = vento;
+      this.vx = 0;
+      this.jogo.audio.rajadaMorgana();
+    } else {
+      this.especial = 0;
+      if (this.perfil.especial && this.perfil.somChute === "capoeira") this.jogo.audio.capoeira("especial");
+      else this.jogo.audio.especial();
+    }
     this.irPara(ESTADOS.SPECIAL, true, "super"); // "super" = tipo de projétil
+  }
+
+  _iniciarRaios() {
+    if (this.recargaRaios > 0 || !this.oponente?.estaVivo()) return;
+    const { recarga, impactos } = this.perfil.invocacaoRaios;
+    const centro = this.oponente.x;
+    const passo = Math.abs(impactos[1].desvio);
+    const ladoInterno = centro < 40 + passo ? 1 : centro > MUNDO_L - 40 - passo ? -1 : 0;
+    this.raios = impactos.map(({ tempo, desvio }, i) => ({
+      tempo,
+      x: centro + (ladoInterno ? ladoInterno * passo * i : desvio),
+      atingiu: false,
+    }));
+    this.recargaRaios = recarga;
+    this.vx = 0;
+    this.irPara(ESTADOS.LIGHTNING, true);
+  }
+
+  _somChute() {
+    if (this.perfil.somChute === "capoeira") this.jogo.audio.capoeira("chute");
+    else this.jogo.audio.chute();
+  }
+
+  _iniciarTeleporte() {
+    if (!this.noChao || this.recargaTeleporte > 0 || !this.oponente?.estaVivo()) return;
+    this.vx = 0;
+    this.recargaTeleporte = this.perfil.teleporte.recarga;
+    this.teleportou = false;
+    this.irPara(ESTADOS.TELEPORT, true);
     this.jogo.audio.especial();
+  }
+
+  _atualizarTeleporte() {
+    const { troca, duracao } = this.perfil.teleporte;
+    const alvo = this.oponente;
+    if (this.estadoTempo >= troca && !this.teleportou) {
+      this.teleportou = true;
+      const lado = -alvo.facing;
+      const separacao = (this.hurtbox().w + alvo.hurtbox().w) / 2 + 12;
+      const destino = alvo.x + lado * separacao;
+      if (alvo.estaVivo() && destino >= 40 && destino <= MUNDO_L - 40) {
+        this.jogo.particulas.faiscas(this.x, this.y - 75, 9, "#a36cff", 80);
+        this.x = destino;
+        this.facing = -lado;
+        this.jogo.particulas.faiscas(this.x, this.y - 75, 9, "#a36cff", 80);
+      }
+    }
+    if (this.estadoTempo >= duracao) this.irPara(ESTADOS.IDLE, true);
   }
 
   /* ESPECIAL DEFENSIVO (P2): dash rápido para TRÁS (esquiva). -------------------
@@ -385,7 +559,13 @@ class Fighter {
   // Retorna um resumo para o Jogo decidir o feedback (partículas/som/shake).
   receberGolpe(info) {
     if (!this.estaVivo()) return { ignorado: true };
+    if (this.estado === ESTADOS.SHELL_GUARD) return { bloqueado: true, ko: false };
     if (this.invencivel > 0) return { ignorado: true };
+    if (this.estado === ESTADOS.SHADOW_GUARD && !info.ignoraBloqueio) {
+      this.comboRecebido = 0;
+      this.comboResetTimer = 0;
+      return { bloqueado: true, ko: false };
+    }
 
     const atacanteDoLado =
       (info.origemX <= this.x && this.facing === -1) ||
@@ -429,7 +609,7 @@ class Fighter {
     // Scaling de knockback: cada hit empurra mais para forçar reposicionamento.
     // No 3º hit: knockback × 2,05 — suficiente para quebrar o range do combo.
     const knockback =
-      info.knockback * (1 + cc.pushbackPorHit * this.comboRecebido);
+      info.knockback * (info.empurraoFixo ? 1 : 1 + cc.pushbackPorHit * this.comboRecebido);
 
     // Avança o contador e reinicia o timer de reset do combo recebido.
     this.comboRecebido++;
@@ -471,6 +651,13 @@ class Fighter {
     if (this.invencivel > 0) this.invencivel -= dt;
     if (this.backdashCooldown > 0) this.backdashCooldown -= dt;
     if (this.dashFrenteCooldown > 0) this.dashFrenteCooldown -= dt;
+    if (this.recargaTeleporte > 0) this.recargaTeleporte -= dt;
+    if (this.recargaSombra > 0) this.recargaSombra -= dt;
+    if (this.recargaSonica > 0) this.recargaSonica -= dt;
+    if (this.recargaPatrulha > 0) this.recargaPatrulha = Math.max(0, this.recargaPatrulha - dt);
+    if (this.recargaCasco > 0) this.recargaCasco = Math.max(0, this.recargaCasco - dt);
+    if (this.recargaVento > 0) this.recargaVento = Math.max(0, this.recargaVento - dt);
+    if (this.recargaRaios > 0) this.recargaRaios = Math.max(0, this.recargaRaios - dt);
     if (this.comboResetTimer > 0) {
       this.comboResetTimer -= dt;
       if (this.comboResetTimer <= 0) {
@@ -488,27 +675,44 @@ class Fighter {
       this.controle.atualizar(dt, this);
 
     if (podeControlar) this._processarInput();
+    if (this.estado === ESTADOS.TELEPORT) this._atualizarTeleporte();
+    if (this.estado === ESTADOS.SHADOW_GUARD && this.estadoTempo >= this.perfil.defesaSombria.duracao) {
+      this.irPara(ESTADOS.IDLE, true);
+    }
 
+    if (this.estado === ESTADOS.SPECIAL && this.perfil.especial?.avanco) {
+      const { avanco } = this.perfil.especial;
+      const quadro = Math.floor(this.estadoTempo * 60 + 1e-6);
+      if (quadro >= avanco[0] && quadro < avanco[1]) this.vx = avanco[2] * this.facing;
+      if (this.perfil.somChute === "capoeira" && quadro % 4 === 0 && quadro < avanco[1]) {
+        const angulo = this.estadoTempo * 23;
+        this.jogo.particulas.folhas(this.x + Math.cos(angulo) * 44, this.y - 12 + Math.sin(angulo) * 8, 1, 45);
+      }
+    }
     this._fisica(dt);
     this._transicoes();
 
-    if (this.estado === ESTADOS.WALK)
-      this.anim.tocar(this._animDoEstado(ESTADOS.WALK));
+    if (this.estado === ESTADOS.WALK || this.estado === ESTADOS.JUMP || this.estado === ESTADOS.BLOCK ||
+      (this.estado === ESTADOS.IDLE && this.perfil.repousoBracos))
+      this.anim.tocar(this._animDoEstado(this.estado));
     this.anim.atualizar(dt);
 
     // CROUCH: mantém sempre o frame 0 da pose agachada (item_0).
     // O frame 1 (item_1) é reservado para o agarrão — não deve aparecer ao agachar.
-    if (this.estado === ESTADOS.CROUCH) this.anim.frame = 0;
+    if (this.estado === ESTADOS.CROUCH && this.anim.anim === "item") this.anim.frame = 0;
 
     // Lança projétil/super no frame ativo de FIREBALL/SPECIAL.
     if (
-      (this.estado === ESTADOS.FIREBALL || this.estado === ESTADOS.SPECIAL) &&
+      (this.estado === ESTADOS.FIREBALL || (this.estado === ESTADOS.SPECIAL && !this.perfil.especial)) &&
       !this.projetilLancado &&
       this._golpeAtivo()
     ) {
       this.jogo.projeteis.push(new Projetil(this, this.golpeAtual));
       this.projetilLancado = true;
-      this.jogo.audio.projetil();
+      if (this.perfil.projetil?.[this.golpeAtual]?.som === "grave") this.jogo.audio.graveGreeg();
+      else if (this.golpeAtual === "sonic") this.jogo.audio.ondaSonica();
+      else if (this.perfil.projetil?.[this.golpeAtual]?.forma === "meia-lua") this.jogo.audio.capoeira("projetil");
+      else this.jogo.audio.projetil();
     }
   }
 
@@ -523,12 +727,12 @@ class Fighter {
       this.janelaCancel > 0 &&
       this.golpes[this.golpeAtual] &&
       this.golpes[this.golpeAtual].cancelavel &&
-      this.comboContador < CONFIG.combo.maxCombo
+      this.comboContador < (this.perfil.maxCombo || CONFIG.combo.maxCombo)
     ) {
       if (acoes.includes("chute")) {
         this.comboContador++;
         this.iniciarChute(false, !this.noChao);
-        this.jogo.audio.chute();
+        this._somChute();
         return;
       }
       if (acoes.includes("soco")) {
@@ -541,7 +745,9 @@ class Fighter {
       }
       if (
         acoes.includes("especial") &&
-        this.especial >= CONFIG.especial.custo
+        !this.perfil.teleporte &&
+        this.podeUsarEspecial() &&
+        (!this.perfil.especial || this.noChao || this.perfil.vooPermanente)
       ) {
         this.comboContador++;
         this.iniciarEspecial();
@@ -551,6 +757,10 @@ class Fighter {
 
     // --- Estados livres: deriva movimento/defesa/agachar a cada quadro ---
     if (this.podeAgir()) {
+      if (this.perfil.vooPermanente) {
+        this._controlarVooPermanente(acoes);
+        return;
+      }
       const querEsq = this.controle.quer("esquerda");
       const querDir = this.controle.quer("direita");
       const querPula = this.controle.quer("pula");
@@ -562,6 +772,11 @@ class Fighter {
       // Atacar ou andar zera as flags — só BLOCK/CROUCH as ativam.
       this.estaAgachado = false;
       this.estaDefendendoBaixo = false;
+
+      if (acoes.includes("especial") && this.perfil.teleporte) {
+        this._iniciarTeleporte();
+        return;
+      }
 
       // Ações de borda (prioridade).
       // ESPECIAL + TRÁS = backdash defensivo (P2). Checado ANTES do super: o
@@ -599,7 +814,7 @@ class Fighter {
       }
       if (
         acoes.includes("especial") &&
-        this.especial >= CONFIG.especial.custo &&
+        this.podeUsarEspecial() &&
         this.noChao
       ) {
         this.comboContador = 1;
@@ -621,7 +836,7 @@ class Fighter {
       if (acoes.includes("chute")) {
         this.comboContador = 1;
         this.iniciarChute(agachado, !this.noChao);
-        this.jogo.audio.chute();
+        this._somChute();
         return;
       }
       if (acoes.includes("projetil")) {
@@ -629,7 +844,29 @@ class Fighter {
         return;
       }
       if (acoes.includes("provoca") && this.noChao) {
-        this.irPara(ESTADOS.TAUNT, true);
+        if (this.perfil.invocacaoRaios) {
+          this._iniciarRaios();
+        } else if (this.perfil.defesaSombria) {
+          if (this.recargaSombra <= 0) {
+            this.vx = 0;
+            this.recargaSombra = this.perfil.defesaSombria.recarga;
+            this.irPara(ESTADOS.SHADOW_GUARD, true);
+            this.jogo.audio.bloqueio();
+          }
+        } else if (this.perfil.ondaSonica) {
+          if (this.recargaSonica <= 0) {
+            this.vx = 0;
+            this.recargaSonica = this.perfil.ondaSonica.recarga;
+            this.irPara(ESTADOS.FIREBALL, true, "sonic");
+          }
+        } else if (this.perfil.voo) {
+          this.vx = 0;
+          this.vy = 0;
+          this.irPara(ESTADOS.FLIGHT, true);
+          this.jogo.audio.pulo();
+        } else {
+          this.irPara(ESTADOS.TAUNT, true);
+        }
         return;
       }
 
@@ -643,7 +880,7 @@ class Fighter {
       }
 
       if (querPula) {
-        this.vy = -FORCA_PULO;
+        this.vy = -FORCA_PULO * (this.perfil.impulsoPulo || 1);
         this.noChao = false;
         // Velocidade horizontal inicial do pulo (direção pressionada no momento).
         if (querDir) this.vx = CONFIG.movimento.velPuloLateral;
@@ -672,7 +909,9 @@ class Fighter {
       if (querEsq || querDir) {
         const dir = querDir ? 1 : -1;
         const avancando = dir === this.facing;
-        this.vx = dir * (avancando ? VEL_CORRER : VEL_ANDAR);
+        const correndo = avancando && (!this.perfil.caminhada ||
+          (this.estado === ESTADOS.WALK && this.estadoTempo >= this.perfil.caminhada));
+        this.vx = dir * (correndo ? VEL_CORRER : VEL_ANDAR) * (this.perfil.velocidade || 1);
         this.irPara(ESTADOS.WALK);
       } else {
         this.vx = 0;
@@ -682,15 +921,35 @@ class Fighter {
   }
 
   _fisica(dt) {
-    if (!this.noChao) this.vy += GRAVIDADE * dt;
+    if (this.perfil.vooPermanente) {
+      this._fisicaVooPermanente(dt);
+      return;
+    }
+    if (this.estado === ESTADOS.FLIGHT) {
+      const { duracao, altura, velocidade } = this.perfil.voo;
+      const rampa = 0.3;
+      const t = Math.max(0, Math.min(1, this.estadoTempo / rampa, (duracao - this.estadoTempo) / rampa));
+      this.y = CHAO_Y - altura * t * t * (3 - 2 * t);
+      this.vy = 0;
+      const dir = Number(this.controle.quer("direita")) - Number(this.controle.quer("esquerda"));
+      this.vx = dir * velocidade;
+    } else if (!this.noChao) {
+      this.vy += GRAVIDADE * dt;
+    }
     this.x += this.vx * dt;
     this.y += this.vy * dt;
+    if (this.estado === ESTADOS.ENTRY && this.perfil.entradaAndando) {
+      const lado = this.slot === "p1" ? 1 : -1;
+      const restante = Math.max(0, 1 - this.estadoTempo / this.perfil.entradaAndando);
+      this.x = this.origemEntrada - lado * 100 * restante;
+    }
 
     if (
       this.estado !== ESTADOS.WALK &&
       this.estado !== ESTADOS.JUMP &&
       this.estado !== ESTADOS.BACKDASH &&
-      this.estado !== ESTADOS.DASH
+      this.estado !== ESTADOS.DASH &&
+      this.estado !== ESTADOS.FLIGHT
     ) {
       // No chão e fora do andar/dash: desacelera rápido (empurrões, hit stun…).
       this.vx *= Math.pow(0.0008, dt);
@@ -713,7 +972,10 @@ class Fighter {
           CHAO_Y,
           CONFIG.particulas.poeiraPulo,
         );
-        if (this.estado === ESTADOS.JUMP) this.irPara(ESTADOS.IDLE, true);
+        if (this.estado === ESTADOS.JUMP || this.estado === ESTADOS.FLIGHT) {
+          if (this.estado === ESTADOS.FLIGHT) this.vx = 0;
+          this.irPara(this.recursos.tem(this.personagem, "land") ? ESTADOS.LAND : ESTADOS.IDLE, true);
+        }
       }
     } else {
       this.noChao = false;
@@ -724,8 +986,99 @@ class Fighter {
     if (this.x > MUNDO_L - margem) this.x = MUNDO_L - margem;
   }
 
+  _controlarVooPermanente(acoes) {
+    const dir = Number(this.controle.quer("direita")) - Number(this.controle.quer("esquerda"));
+    const subir = this.controle.quer("pula");
+    const descer = this.controle.quer("agacha");
+    this.nivelVoo = Number(subir) - Number(descer);
+    this.velVoo = 0;
+    this.estaAgachado = false;
+    this.estaDefendendoBaixo = false;
+
+    if (acoes.includes("especial") && this.podeUsarEspecial()) {
+      this.iniciarEspecial();
+    } else if (acoes.includes("soco")) {
+      this.comboContador = 1;
+      this.iniciarSoco(dir !== 0, false);
+      this.jogo.audio.soco();
+    } else if (acoes.includes("chute")) {
+      this.comboContador = 1;
+      this.iniciarChute(false, true);
+      this._somChute();
+    } else if (acoes.includes("projetil")) {
+      this.iniciarProjetil(false);
+    } else if (acoes.includes("agarra")) {
+      this.iniciarAgarra();
+    } else if (acoes.includes("provoca")) {
+      this.irPara(ESTADOS.PUNCH, true, "beak");
+      this.vx = 230 * this.facing;
+      this.jogo.audio.corteAr();
+    } else if (this.controle.quer("defende")) {
+      this.estaDefendendoBaixo = descer;
+      this.irPara(ESTADOS.BLOCK);
+    } else if (dir !== 0) {
+      const avancando = dir === this.facing;
+      const rapido = avancando && this.estado === ESTADOS.WALK && this.estadoTempo > this.perfil.caminhada;
+      this.velVoo = dir * (rapido ? VEL_CORRER : VEL_ANDAR) * this.perfil.velocidade;
+      this.irPara(ESTADOS.WALK);
+    } else {
+      this.irPara(subir ? ESTADOS.JUMP : descer ? ESTADOS.CROUCH : ESTADOS.IDLE);
+    }
+  }
+
+  _fisicaVooPermanente(dt) {
+    const voo = this.perfil.vooPermanente;
+    this.tempoVoo += dt;
+    if (this.patrulha) {
+      const { origemX, origemY, destino, lado } = this.patrulha;
+      const t = Math.min(1, this.estadoTempo / this.perfil.especial.duracao);
+      const curva = t === 1 ? 0 : Math.sin(Math.PI * t);
+      this.x = origemX + (destino - origemX) * curva;
+      this.y = Math.max(CHAO_Y - voo.maxima, origemY - 30 * curva * curva);
+      this.facing = t < 0.5 ? lado : -lado;
+      this.anim.tocar(t < 0.4 ? "patrulha_ida" : t < 0.6 ? "patrulha_curva" : "patrulha_volta");
+      if (Math.floor((this.estadoTempo - dt) * 24) !== Math.floor(this.estadoTempo * 24)) {
+        this.jogo.particulas.folhas(this.x - this.facing * 46, this.y - 78, 2, 52, ["#fff1bf", "#ffc76b"]);
+      }
+      if (t >= 1) this.irPara(ESTADOS.IDLE, true);
+      return;
+    }
+
+    const nivel = this.podeAgir() ? this.nivelVoo : 0;
+    const altura = nivel > 0 ? voo.maxima - 8 : nivel < 0 ? voo.minima + 5 : voo.altura;
+    const bob = 4 * Math.sin(this.tempoVoo * 13);
+    const alvoY = CHAO_Y - altura + bob;
+    this.vy += ((alvoY - this.y) * 78 - this.vy * 15) * dt;
+    this.y = Math.max(CHAO_Y - voo.maxima, Math.min(CHAO_Y - voo.minima, this.y + this.vy * dt));
+    const vel = this.podeAgir() ? this.velVoo : 0;
+    this.vx += (vel - this.vx) * (1 - Math.exp(-12 * dt));
+    this.x += this.vx * dt;
+
+    if (this.estado === ESTADOS.ENTRY) {
+      const lado = this.slot === "p1" ? 1 : -1;
+      this.x = this.origemPoseVoo - lado * 130 * Math.max(0, 1 - this.estadoTempo / 0.48) ** 2;
+    } else if (this.estado === ESTADOS.VICTORY && this.estadoTempo < 0.8) {
+      this.x = this.origemPoseVoo + this.facing * 30 * Math.sin(this.estadoTempo / 0.8 * Math.PI * 2);
+      this.y = Math.max(CHAO_Y - voo.maxima, this.y - 12 * Math.sin(this.estadoTempo / 0.8 * Math.PI) ** 2);
+    }
+    this.limitarVooNaArena();
+  }
+
+  limitarVooNaArena() {
+    if (this.perfil.vooPermanente) this.x = Math.max(40, Math.min(MUNDO_L - 40, this.x));
+  }
+
   _transicoes() {
     switch (this.estado) {
+      case ESTADOS.SHELL_GUARD:
+        if (this.estadoTempo + 1e-8 >= this.perfil.defesaCasco.duracao)
+          this.irPara(ESTADOS.SHELL_EXIT, true);
+        break;
+      case ESTADOS.ENTRY:
+      case ESTADOS.LAND:
+      case ESTADOS.SHELL_EXIT:
+        if (this.anim.terminou) this.irPara(ESTADOS.IDLE, true);
+        break;
       case ESTADOS.PUNCH:
       case ESTADOS.KICK:
       case ESTADOS.GRAB:
@@ -744,18 +1097,19 @@ class Fighter {
         break;
       case ESTADOS.FIREBALL:
       case ESTADOS.SPECIAL:
-        if (this.anim.terminou) this.irPara(ESTADOS.IDLE, true);
+      case ESTADOS.LIGHTNING:
+        if (!this.patrulha && this.anim.terminou) this.irPara(ESTADOS.IDLE, true);
         break;
       case ESTADOS.HIT:
         if (this.anim.terminou && this.estadoTempo > 0.25)
           this.irPara(ESTADOS.IDLE, true);
         break;
       case ESTADOS.KNOCKDOWN:
-        if (this.noChao && this.estadoTempo > 0.7) {
+        if ((this.noChao || this.perfil.vooPermanente) && this.estadoTempo > 0.7) {
           this.irPara(ESTADOS.GETUP, true);
           // Invencibilidade começa ao levantar: cobre toda a animação de getup
           // (~0.25 s) + janela de reação ao ficar de pé (~0.4 s).
-          this.invencivel = CONFIG.gameFeel.wakeupInvencivelMs / 1000;
+          if (!this.perfil.vooPermanente) this.invencivel = CONFIG.gameFeel.wakeupInvencivelMs / 1000;
         }
         break;
       case ESTADOS.GETUP:
@@ -813,20 +1167,255 @@ class Fighter {
     ctx.restore();
   }
 
+  _desenharEspinhosSombrios(ctx, frente) {
+    const tempo = this.estadoTempo;
+    const restante = this.perfil.defesaSombria.duracao - tempo;
+    const brotar = Math.min(1, (tempo + 0.025) / 0.18);
+    const alcance = 1 - (1 - brotar) ** 3;
+    const opacidade = Math.min(1, Math.max(0, restante / 0.13));
+    const ramos = frente
+      ? [[-1, 29, 45, 70], [1, 30, 48, 82]]
+      : [[-1, 42, 57, 184], [1, 45, 66, 168]];
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.globalAlpha *= opacidade;
+    ctx.lineJoin = "round";
+    ctx.lineWidth = 1.35;
+    ctx.fillStyle = frente ? "#240f35" : "#1b0a29";
+    ctx.strokeStyle = frente ? "#cf8aff" : "#9f55d2";
+    ctx.shadowColor = "#9b45e8";
+    ctx.shadowBlur = frente ? 5 : 9;
+
+    for (const [lado, raiz, curva, altura] of ramos) {
+      const ponto = (t) => {
+        const x = raiz + 4 * curva * t * (1 - t) + 15 * t;
+        return [lado * x, -altura * t];
+      };
+      ctx.beginPath();
+      for (const borda of [-1, 1]) {
+        for (let i = 0; i <= 14; i++) {
+          const t = alcance * (borda === -1 ? i : 14 - i) / 14;
+          const [x, y] = ponto(t);
+          const largura = 5.6 * (1 - t) * (1 - t / alcance) + 0.35;
+          ctx.lineTo(x + largura * borda, y);
+        }
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      for (let i = 1; i <= 6; i++) {
+        const t = i * 0.135;
+        if (alcance <= t) break;
+        const [x, y] = ponto(t);
+        const [baseX, baseY] = ponto(t - 0.05);
+        const ladoEspinho = i % 2 ? lado : -lado;
+        const tamanho = (22 - t * 8) * Math.min(1, (alcance - t) / 0.12);
+        ctx.beginPath();
+        ctx.moveTo(baseX, baseY);
+        ctx.quadraticCurveTo(x + ladoEspinho * tamanho * 0.35, y, x + ladoEspinho * tamanho, y - tamanho * 0.8);
+        ctx.lineTo(x, y - 4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  _desenharVendaval(ctx) {
+    const progresso = Math.max(0, Math.min(1, (this.estadoTempo - 0.14) / 0.36));
+    if (progresso === 0 || progresso === 1) return;
+    ctx.save();
+    ctx.translate(this.x, this.y - 80);
+    ctx.scale(this.facing, 1);
+    ctx.globalAlpha *= Math.sin(progresso * Math.PI);
+    for (let i = 0; i < 6; i++) {
+      const x = 64 + progresso * 340 - i * 32;
+      if (x < 28) continue;
+      ctx.lineWidth = i % 2 ? 2 : 5;
+      ctx.strokeStyle = i % 2 ? "#c47da8" : "#54253f";
+      ctx.beginPath();
+      ctx.ellipse(x, i * 11 - 25, 29 + i * 5, 45 - i * 4, -0.39, -1.5, 1.4);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  _desenharRaio(ctx, x, idade) {
+    if (idade < -0.25 || idade >= 0.18) return;
+    ctx.save();
+    if (idade < 0) {
+      const intensidade = 0.38 + 0.62 * (1 + idade / 0.25);
+      ctx.globalAlpha *= intensidade;
+      const aviso = ctx.createRadialGradient(x, 55, 9, x, 55, 72);
+      aviso.addColorStop(0, "#7a316dbf");
+      aviso.addColorStop(1, "#24082000");
+      ctx.fillStyle = aviso;
+      ctx.fillRect(x - 72, 0, 144, 127);
+      ctx.strokeStyle = "#f29bce";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 6]);
+      ctx.beginPath();
+      ctx.moveTo(x, 73);
+      ctx.lineTo(x, CHAO_Y - 10);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.ellipse(x, CHAO_Y - 2, this.perfil.invocacaoRaios.raio, 9, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    } else {
+      ctx.globalAlpha *= 1 - idade / 0.18;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(x - 8, 0);
+      ctx.lineTo(x + 6, CHAO_Y * 0.11);
+      ctx.lineTo(x + 24, CHAO_Y * 0.24);
+      ctx.lineTo(x + 7, CHAO_Y * 0.32);
+      ctx.lineTo(x - 19, CHAO_Y * 0.45);
+      ctx.lineTo(x - 5, CHAO_Y * 0.52);
+      ctx.lineTo(x + 11, CHAO_Y * 0.65);
+      ctx.lineTo(x - 13, CHAO_Y * 0.83);
+      ctx.lineTo(x, CHAO_Y);
+      for (const [largura, cor] of [[38, "#991cae70"], [26, "#d94287"], [16, "#ffa4d7"], [10, "#fff7fe"]]) {
+        ctx.lineWidth = largura;
+        ctx.strokeStyle = cor;
+        ctx.stroke();
+      }
+
+      ctx.beginPath();
+      ctx.moveTo(x + 24, CHAO_Y * 0.24);
+      ctx.lineTo(x + 67, CHAO_Y * 0.36);
+      ctx.lineTo(x + 45, CHAO_Y * 0.54);
+      ctx.moveTo(x - 19, CHAO_Y * 0.45);
+      ctx.lineTo(x - 66, CHAO_Y * 0.57);
+      ctx.lineTo(x - 59, CHAO_Y * 0.68);
+      ctx.lineTo(x - 89, CHAO_Y * 0.77);
+      ctx.moveTo(x - 13, CHAO_Y * 0.83);
+      ctx.lineTo(x - 54, CHAO_Y * 0.92);
+      ctx.lineTo(x - 66, CHAO_Y - 5);
+      ctx.moveTo(x, CHAO_Y);
+      ctx.lineTo(x + 41, CHAO_Y - 13);
+      ctx.lineTo(x + 65, CHAO_Y - 6);
+      for (const [largura, cor] of [[13, "#aa3ebe88"], [7, "#ed73b2"], [3, "#ffe6f6"]]) {
+        ctx.lineWidth = largura;
+        ctx.strokeStyle = cor;
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
   desenhar(ctx, debug) {
     const fr = this.recursos.frame(
       this.personagem,
       this.anim.anim,
       this.anim.frame,
     );
-    const dw = this.recursos.frameW * ESCALA;
-    const dh = this.recursos.frameH * ESCALA;
+    const spriteLuta = this.recursos.manifest.players[this.personagem]?.spriteLuta;
+    const escala = ESCALA * (spriteLuta?.escala ?? this.perfil.escalaSprite ?? 1);
+    const dw = this.recursos.frameW * escala;
+    const dh = this.recursos.frameH * escala;
     const dx = this.x - dw / 2;
-    const dy = this.y - dh;
+    // Compensa a margem transparente do sprite depois de redimensioná-lo.
+    const dy = this.y - dh + (spriteLuta?.ajusteY ?? 0) * ESCALA;
 
     this._desenharSombra(ctx); // penumbra no chão, sob o personagem
 
+    if (this.estado === ESTADOS.SPECIAL && this.perfil.especial?.recargaVento) this._desenharVendaval(ctx);
+    if (this.estado === ESTADOS.LIGHTNING) {
+      for (const raio of this.raios) this._desenharRaio(ctx, raio.x, this.estadoTempo - raio.tempo);
+    } else if (this.estado === ESTADOS.VICTORY && this.perfil.invocacaoRaios) {
+      this._desenharRaio(ctx, this.x - this.facing * 110, this.estadoTempo - 0.53);
+    }
+
+    if (this.estado === ESTADOS.SHELL_GUARD) {
+      const oscilacao = Math.sin(this.estadoTempo * 18);
+      const altura = this.estadoTempo < 0.16 ? 68 : 53;
+      const brilho = ctx.createRadialGradient(this.x, this.y - altura, 28, this.x, this.y - altura, 89);
+      brilho.addColorStop(0, "rgba(152,247,51,0.1)");
+      brilho.addColorStop(0.68, "rgba(203,255,80,0.42)");
+      brilho.addColorStop(1, "rgba(255,211,64,0)");
+      ctx.save();
+      ctx.fillStyle = brilho;
+      ctx.fillRect(this.x - 89, this.y - altura - 89, 178, 178);
+      ctx.strokeStyle = "rgba(217,248,115,0.8)";
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.ellipse(this.x, this.y - altura, 78 + oscilacao * 3, 51, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+    if (this.patrulha || (this.golpeAtual === "beak" && this._golpeAtivo())) {
+      ctx.save();
+      ctx.translate(this.x, this.y - 96);
+      ctx.scale(this.facing, 1);
+      const cortando = !this.patrulha;
+      for (let i = 0; i < 3; i++) {
+        ctx.strokeStyle = i === 0 ? "rgba(255,246,201,0.88)" : "rgba(255,166,49,0.59)";
+        ctx.lineWidth = 4 - i;
+        ctx.beginPath();
+        ctx.ellipse(cortando ? 72 : -i * 16, i * 8, 48 + i * 11, 20 + i * 5, -0.19,
+          cortando ? -1.35 : 0.65, cortando ? 1.25 : Math.PI * 1.58);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    if (this.estado === ESTADOS.SPECIAL && this.perfil.especial?.efeito === "tornado") {
+      const giro = this.estadoTempo * 25;
+      ctx.save();
+      ctx.translate(this.x + this.facing * 22, this.y - 22);
+      ctx.lineWidth = 2.5;
+      for (let i = 0; i < 5; i++) {
+        ctx.strokeStyle = i % 2 ? "rgba(203,178,255,0.73)" : "rgba(126,97,241,0.55)";
+        ctx.beginPath();
+        ctx.ellipse(0, -i * 28, 69 - i * 4, 11, -0.13 * this.facing,
+          giro + i, giro + i + Math.PI * 1.25);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    const defesaSombria = this.estado === ESTADOS.SHADOW_GUARD;
+    const teleportando = this.estado === ESTADOS.TELEPORT;
+    if (defesaSombria || teleportando) {
+      const gradiente = ctx.createRadialGradient(this.x, this.y - 92, 12, this.x, this.y - 92, 103);
+      gradiente.addColorStop(0, "rgba(19,8,29,0.62)");
+      gradiente.addColorStop(0.65, "rgba(81,27,132,0.43)");
+      gradiente.addColorStop(1, "rgba(117,60,183,0)");
+      ctx.fillStyle = gradiente;
+      ctx.fillRect(this.x - 104, this.y - 196, 208, 208);
+    }
+    if (defesaSombria) this._desenharEspinhosSombrios(ctx, false);
+
+    if (this.estado === ESTADOS.FLIGHT) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(133,229,255,0.65)";
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 2; i++) {
+        ctx.beginPath();
+        ctx.ellipse(this.x, this.y + 4 + 7 * i, 24 - 6 * i, 4, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
     ctx.save();
+    if (this.estado === ESTADOS.CAPTURED && this.anguloCaptura) {
+      const centroY = this.y - 72;
+      ctx.translate(this.x, centroY);
+      ctx.rotate(this.anguloCaptura);
+      ctx.translate(-this.x, -centroY);
+    }
+    if (teleportando) {
+      const { troca, duracao } = this.perfil.teleporte;
+      const visibilidade = this.estadoTempo < troca
+        ? 1 - this.estadoTempo / troca
+        : (this.estadoTempo - troca) / (duracao - troca);
+      ctx.globalAlpha *= Math.max(0.05, Math.min(1, visibilidade));
+    }
     if (this.facing === -1) {
       ctx.translate(this.x, 0);
       ctx.scale(-1, 1);
@@ -873,6 +1462,22 @@ class Fighter {
       ctx.fillText(this.anim.anim + ":" + this.anim.frame, this.x, this.y - 80);
     }
     ctx.restore();
+
+    if (defesaSombria) this._desenharEspinhosSombrios(ctx, true);
+    const orbe = this.perfil.projetil?.fireball;
+    if (this.estado === ESTADOS.FIREBALL && orbe?.forma === "orbe-carmesim" && !this.projetilLancado) {
+      const x = this.x + this.facing * (orbe.origem[0] - 9);
+      const y = this.y + orbe.origem[1];
+      const r = 6 + 14 * Math.min(1, this.estadoTempo * 8);
+      ctx.save();
+      const brilho = ctx.createRadialGradient(x, y, 1, x, y, r);
+      brilho.addColorStop(0, "#fff4f0");
+      brilho.addColorStop(0.35, "#f24579");
+      brilho.addColorStop(1, "#480e2600");
+      ctx.fillStyle = brilho;
+      ctx.fillRect(x - r, y - r, r * 2, r * 2);
+      ctx.restore();
+    }
 
     if (debug) {
       const hb = this.hurtbox();

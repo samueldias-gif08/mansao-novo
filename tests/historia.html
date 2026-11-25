@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<title>Teste da história de Mansão Fight</title>
+<style>
+  body { background: #10121d; color: #fff; }
+  iframe { display: block; border: 0; width: min(960px, 98vw); height: 560px; }
+  #planos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  #planos img { width: 100%; display: block; }
+</style>
+<pre id="resultado">Executando...</pre>
+<div id="planos"></div>
+<script>
+  const exigir = (condicao, mensagem) => {
+    if (!condicao) throw new Error(mensagem);
+  };
+
+  async function testar() {
+    const fonte = (await (await fetch("../index.html")).text())
+      .replace("<head>", '<head><base href="../">')
+      .replace('<script src="src/main.js"><\/script>', "");
+    const iframe = document.createElement("iframe");
+    iframe.allowFullscreen = true;
+    const carregou = new Promise((resolve) => iframe.addEventListener("load", resolve, { once: true }));
+    iframe.srcdoc = fonte;
+    document.body.append(iframe);
+    await carregou;
+    const janela = iframe.contentWindow;
+    const { jogo, TELAS, CENAS_HISTORIA, START_TIMING, ELENCO_INVASAO, audio, originais, efeitos, pausas } =
+      await janela.Function(`
+      return (async () => {
+        const manifest = await carregarManifest();
+        const recursos = new Recursos(manifest);
+        const catalogo = new CatalogoMapas(manifest);
+        await Promise.all([recursos.precarregar(), catalogo.descobrir()]);
+        const efeitos = [];
+        const pausas = [];
+        const jogo = new Jogo(document.getElementById("tela"), recursos, catalogo, {
+          tocar() {}, pausar() { pausas.push("pausar"); }, retomar() { pausas.push("retomar"); },
+        }, { tocar() {} });
+        jogo.audio.garantir = () => {};
+        const audio = AudioHistoria.prototype;
+        const originais = { tocar: audio.tocar, falar: audio.falar, encerrar: audio.encerrar };
+        audio.tocar = (nome) => efeitos.push(nome);
+        audio.falar = (nome, texto) => efeitos.push(nome + ": " + texto);
+        audio.encerrar = function () { efeitos.push("encerrar"); originais.encerrar.call(this); };
+        return { jogo, TELAS, CENAS_HISTORIA, START_TIMING, ELENCO_INVASAO, audio, originais, efeitos, pausas };
+      })();
+    `)();
+    const { recursos } = jogo;
+    exigir(Object.keys(recursos.artesHistoria).length === 17, "Artes da história carregadas");
+    exigir(jogo.recursos.artesHistoria.efeitos?.naturalWidth > 0, "Folha de efeitos animados carregada");
+    for (const cena of CENAS_HISTORIA) {
+      for (const [id, quadros] of Object.entries(cena.atores || {})) {
+        for (const [, , , anim] of quadros) exigir(recursos.meta(id, anim)?.framesReais, `Sprite ${id}/${anim}`);
+      }
+    }
+    for (const [id, , , , , anim] of ELENCO_INVASAO) exigir(recursos.meta(id, anim)?.framesReais, `Entrada ${id}`);
+    const tecla = (codigo) => {
+      jogo.entrada.bordas.push(codigo);
+      jogo._atualizar(1 / 60);
+      jogo.entrada.bordas.length = 0;
+    };
+    const titulo = () => {
+      jogo.tela = TELAS.START;
+      jogo.start.fase = "titulo";
+      jogo._desenhar();
+    };
+    titulo();
+    tecla("Tab");
+    exigir(jogo.start.fase === "titulo", "Tab permite navegar pelos botões");
+    jogo.acoesTitulo.querySelector("#assistir-historia").click();
+    jogo._atualizar(START_TIMING.saida + 0.01);
+    jogo._desenhar();
+    exigir(jogo.tela === TELAS.HISTORIA && !jogo.pularHistoria.hidden, "Iniciar abre história com botão Pular");
+    const ordem = new Set();
+    const legendas = new Set();
+    const ctx = jogo.ctx;
+    const fillText = ctx.fillText.bind(ctx);
+    ctx.fillText = (texto, ...args) => {
+      legendas.add(texto);
+      return fillText(texto, ...args);
+    };
+    const amostras = { noite: [0.7, 3.5, 7.1], duelo: [4.1, 9.55], patrulha: [3.7, 10.5],
+      tres: [5.6, 10.24], falha: [1.2, 2.9, 4.8], explosao: [3.85, 4.92, 6.7],
+      invasao: [6.7, 11.55], titulo: [0.8, 3.75] };
+    const mostrar = new URLSearchParams(location.search).has("planos");
+    const inicio = performance.now();
+    const historia = jogo.historia;
+    const [poseA, poseB] = ["p1-0", "p1-1"].map((id) => recursos.artesHistoria[id]);
+    exigir(historia.efeitos.length === 16, "Quatro quadros para cada efeito");
+    exigir(historia._transicaoSprite(poseA, poseB, 0) === poseA &&
+      historia._transicaoSprite(poseA, poseB, 0.5) === historia.transicao &&
+      historia._transicaoSprite(poseA, poseB, 1) === poseB, "Quadro intermediário preserva as poses de origem");
+    const temposDeDesenho = [];
+    let quadros = 0;
+    while (jogo.tela === TELAS.HISTORIA && quadros < 800) {
+      const { id } = historia.cena;
+      ordem.add(id);
+      const t0 = performance.now();
+      jogo._desenhar();
+      temposDeDesenho.push(performance.now() - t0);
+      if (mostrar && amostras[id]?.length && historia.tempo >= amostras[id][0]) {
+        amostras[id].shift();
+        const img = document.createElement("img");
+        img.src = jogo.canvas.toDataURL("image/jpeg", 0.76);
+        img.alt = id;
+        document.getElementById("planos").append(img);
+      }
+      jogo._atualizar(0.1);
+      quadros++;
+    }
+    const ms = performance.now() - inicio;
+    const duracao = CENAS_HISTORIA.reduce((total, cena) => total + cena.duracao, 0);
+    exigir(duracao === 73 && Math.abs(quadros / 10 - duracao) <= 0.11, "Duração total de 73 segundos");
+    const confronto = CENAS_HISTORIA.find(({ id }) => id === "tres");
+    exigir(confronto.duracao === 11 && confronto.atores.android67.every((quadro) => quadro[3] !== "special"),
+      "Confronto encurtado e Android continua em voo");
+    exigir([...ordem].join() === CENAS_HISTORIA.map((cena) => cena.id).join(), "Oito cenas em ordem");
+    exigir(jogo.tela === TELAS.MODO && jogo.historia === null && historia.telaVirtual === null &&
+      historia.transicao === null && historia.efeitos.length === 0, "Término libera cena e abre modos");
+    for (const cena of CENAS_HISTORIA) {
+      for (const [, , nome, fala] of cena.falas || []) {
+        exigir(legendas.has(fala) && efeitos.includes(nome + ": " + fala), `Fala e legenda de ${nome}`);
+      }
+    }
+    exigir(legendas.has("O jogo acabou de se tornar realidade."), "Frase final");
+    exigir(efeitos.filter((e) => e === "colisao").length === 3 && efeitos.includes("metal") &&
+      efeitos.includes("falha") && efeitos.includes("trovaoMorgana") && !efeitos.includes("laser"),
+      "Gatilhos sonoros do impacto, da falha e dos raios de Morgana");
+    exigir(efeitos.at(-1) === "encerrar" && pausas.join() === "pausar,retomar", "Áudio da história encerrado");
+
+    for (const [origem, comando, destino] of [
+      ["assistir-historia", "Enter", TELAS.START],
+      ["assistir-historia", "Escape", TELAS.START],
+      ["assistir-historia", "botao", TELAS.START],
+    ]) {
+      titulo();
+      jogo.acoesTitulo.querySelector("#" + origem).click();
+      jogo._atualizar(START_TIMING.saida + 0.01);
+      jogo._desenhar();
+      exigir(jogo.tela === TELAS.HISTORIA, `Reprodução pelo botão ${origem}`);
+      const antes = efeitos.length;
+      if (comando === "botao") jogo.pularHistoria.click();
+      else tecla(comando);
+      jogo._desenhar();
+      exigir(jogo.historia === null && jogo.tela === destino && jogo.pularHistoria.hidden, `Destino de ${comando}`);
+      exigir(efeitos.length === antes + 1 && efeitos.at(-1) === "encerrar", "Sem eventos pendentes após sair");
+    }
+    exigir(jogo.p1 === null && jogo.p2 === null, "Sem lutadores de partida durante a abertura");
+    temposDeDesenho.sort((a, b) => a - b);
+    const p95 = temposDeDesenho[Math.floor(temposDeDesenho.length * 0.95)];
+    const saida = document.getElementById("resultado");
+    saida.textContent = `OK — 8 cenas, ${duracao} s, 5 falas, efeitos, menu História e 3 comandos para pular.
+${quadros} quadros amostrados em ${ms.toFixed(0)} ms. P95 de submissão ao Canvas: ${p95.toFixed(2)} ms.`;
+    saida.dataset.estado = "ok";
+    if (mostrar) iframe.hidden = true;
+    Object.assign(audio, originais);
+    window.testeHistoria = { jogo, TELAS, START_TIMING, iframe };
+  }
+
+  testar().catch((erro) => {
+    const saida = document.getElementById("resultado");
+    saida.textContent = String(erro.stack || erro);
+    saida.dataset.estado = "erro";
+  });
+</script>

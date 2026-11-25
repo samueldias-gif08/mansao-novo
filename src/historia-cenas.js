@@ -1,0 +1,107 @@
+"use strict";
+
+// Quadros de direção: [segundo, x, chão, animação, direção, escala, inclinação].
+// A coordenada de chão pode ficar suspensa para voo e saltos.
+const CENAS_HISTORIA = [
+  {
+    id: "noite", duracao: 8, trilha: "quarto",
+    sons: [[1.8, "controle"], [2.65, "controle"], [3.45, "controle"], [4.05, "controle"], [6.8, "portal"]],
+  },
+  {
+    id: "duelo", duracao: 10, trilha: "luta",
+    cameras: [[0, 480, 285, 1.02, 0], [2.4, 510, 315, 1.22, 0.015],
+      [4.2, 463, 325, 1.24, -0.025], [6.2, 500, 311, 1.08, 0.017],
+      [8, 480, 301, 1.02, 0], [9.6, 480, 308, 1.32, -0.02]],
+    atores: {
+      serena: [[0, 265, 463, "idle", 1, 1.06], [2.12, 318, 463, "walk_forward"],
+        [2.7, 328, 463, "crouch"], [3.32, 286, 463, "block_low"], [3.95, 345, 463, "kick_armada"],
+        [4.6, 389, 463, "land"], [5.28, 352, 464, "jump", 1, 1.06, -0.15],
+        [5.85, 310, 389, "kick_jump", 1, 1.06, -0.42], [6.33, 270, 441, "fall", 1, 1.06, 0.15],
+        [6.8, 262, 463, "land"], [7.5, 266, 463, "idle"], [8.45, 310, 463, "run"],
+        [9.12, 421, 436, "kick_martelo"], [9.6, 433, 433, "hit"]],
+      alessander: [[0, 705, 466, "idle", -1, 1.08], [1.62, 672, 466, "run"], [2.37, 502, 466, "punch_step"],
+        [2.78, 477, 466, "punch_hook"], [3.19, 464, 466, "punch_elbow"], [3.62, 459, 466, "idle"],
+        [4.02, 478, 466, "block"], [4.72, 515, 466, "kick_side"], [5.5, 480, 466, "kick_side"],
+        [6.23, 536, 466, "land"], [7.1, 611, 466, "idle"], [8.4, 632, 466, "run"],
+        [9.12, 535, 464, "punch_step"], [9.6, 530, 465, "hit"]],
+    },
+    sons: [[2.45, "soco"], [2.91, "soco"], [3.29, "corteAr"], [4.23, "chute"], [5.18, "corteAr"],
+      [5.7, "chute"], [9.44, "colisao"]],
+  },
+  {
+    id: "patrulha", duracao: 12, trilha: "luta",
+    cameras: [[0, 530, 300, 1.07, 0], [2.5, 480, 272, 1.03, 0], [5.6, 494, 304, 1.12, -0.02],
+      [8.8, 565, 310, 1.16, 0.015], [10.8, 596, 320, 1.18, 0], [12, 621, 291, 2.85, 0]],
+    atores: {
+      greeg: [[0, 855, 470, "walk", -1, 1.10], [1.8, 681, 470, "idle_arms"], [2.9, 644, 470, "idle"],
+        [3.55, 626, 470, "shell_guard"], [4.8, 628, 470, "shell_exit"], [5.52, 627, 470, "sonic"],
+        [6.64, 637, 470, "sonic"], [7.58, 639, 470, "hit"], [8.15, 652, 470, "knockdown"],
+        [8.82, 676, 470, "crouch"], [9.26, 682, 470, "block_low"], [10.18, 683, 470, "hit"],
+        [10.8, 686, 470, "block_low"], [11.47, 685, 470, "block_low"]],
+      carter: [[0.95, -105, 277, "patrulha_ida", 1, 0.93], [2.12, 334, 300, "patrulha_ida"],
+        [2.8, 451, 313, "special"], [3.47, 522, 344, "patrulha_ida"], [4.35, 801, 310, "patrulha_curva"],
+        [5, 854, 238, "patrulha_volta", -1], [5.72, 715, 216, "patrulha_volta"],
+        [6.48, 458, 276, "patrulha_curva", -1, 0.93, -0.16], [6.98, 431, 315, "patrulha_ida", 1],
+        [7.49, 555, 385, "beak"], [8.15, 585, 343, "patrulha_curva"],
+        [8.88, 603, 410, "grab"], [9.64, 574, 386, "idle"], [10.62, 565, 377, "victory"],
+        [11.6, 565, 377, "idle"]],
+    },
+    sons: [[1.1, "asas"], [2.03, "asas"], [3.03, "corteAr"], [3.92, "metal"], [5.62, "ondaSonica"],
+      [6.76, "asas"], [7.68, "corteAr"], [8.2, "chute"], [9.18, "metal"], [11.6, "portal"]],
+    falas: [[9.7, 11.55, "Tenente Carter", "Você está preso, MC Greeg!"]],
+  },
+  {
+    id: "tres", duracao: 11, trilha: "luta",
+    cameras: [[0, 478, 280, 1.08, 0], [1.75, 472, 313, 1.18, -0.01], [4.4, 522, 324, 1.17, 0.024],
+      [6.75, 490, 320, 1.05, -0.018], [8.65, 475, 284, 1.01, 0], [9.7, 478, 280, 1.11, 0],
+      [11, 480, 271, 2.12, -0.018]],
+    atores: {
+      morgana: [[0, 488, 469, "entry", -1, 1.15], [1.25, 483, 469, "idle"], [3.05, 482, 469, "walk_forward"],
+        [4.8, 520, 469, "grab"], [5.55, 493, 469, "throw_tech"], [6.45, 469, 469, "punch_triple"],
+        [7.2, 455, 469, "special", 1], [8.45, 350, 470, "lightning", 1], [10.23, 311, 470, "block", 1]],
+      belyx: [[1.04, 166, 472, "entry", 1], [1.78, 202, 472, "idle"], [2.42, 263, 472, "run"],
+        [3.06, 506, 472, "kick_side"], [3.68, 573, 472, "punch_elbow"], [4.32, 592, 472, "kick_knee"],
+        [4.83, 565, 472, "hit", -1], [5.32, 551, 472, "teleport"],
+        [5.77, 370, 473, "teleport", 1], [6.28, 339, 472, "block"], [7.19, 220, 473, "shadow_guard"],
+        [8.62, 181, 472, "fireball"], [10.25, 202, 472, "block"]],
+      android67: [[1.46, 1002, 471, "walk_forward", -1, 1.03], [2.58, 764, 471, "idle"],
+        [3.22, 737, 471, "block"], [3.8, 728, 471, "block"], [4.29, 717, 471, "punch_cross"],
+        [4.92, 702, 471, "punch_hook"], [5.48, 715, 471, "punch_step"], [6.02, 736, 471, "jump"],
+        [6.85, 756, 360, "flight"], [7.7, 797, 315, "flight"], [8.8, 805, 330, "flight"],
+        [9.66, 797, 353, "flight"], [10.1, 817, 355, "flight"]],
+    },
+    sons: [[1.02, "portal"], [3.22, "chute"], [3.9, "soco"], [4.49, "chute"], [4.85, "soco"],
+      [5.48, "portal"], [6.54, "soco"], [7.33, "rajadaMorgana"], [8.7, "trovaoMorgana"],
+      [9.12, "portal"], [9.76, "colisao"], [10.48, "falha"]],
+  },
+  {
+    id: "falha", duracao: 7, trilha: "falha",
+    sons: [[0.03, "falha"], [1.69, "falha"], [3.42, "falha"], [5.04, "colisao"], [6.12, "portal"]],
+  },
+  {
+    id: "explosao", duracao: 8, trilha: "explosao",
+    sons: [[0.3, "falha"], [1.42, "falha"], [2.83, "portal"]],
+  },
+  {
+    id: "invasao", duracao: 12, trilha: "final",
+    sons: [[0.95, "portal"], [2.41, "asas"], [3.36, "metal"], [4.13, "portal"], [4.98, "portal"],
+      [5.87, "asas"]],
+    falas: [[6.38, 7.68, "Samuel", "Isso não é possível..."], [7.72, 8.84, "Vitor", "Eles saíram do jogo?!"],
+      [8.9, 10.08, "Erick", "E agora, o que a gente faz?"],
+      [10.12, 11.96, "Morgana", "Parece que encontramos um novo campo de batalha."]],
+  },
+  {
+    id: "titulo", duracao: 5, trilha: "final",
+    sons: [[2.03, "corteAr"]],
+  },
+];
+
+const ELENCO_INVASAO = [
+  ["serena", 0.85, 267, 485, 1.02, "entry"],
+  ["alessander", 1.65, 383, 447, 0.96, "entry"],
+  ["carter", 2.42, 490, 304, 0.76, "patrulha_curva"],
+  ["greeg", 3.25, 484, 478, 0.95, "block_low"],
+  ["belyx", 4.02, 598, 485, 1.02, "teleport"],
+  ["android67", 4.82, 758, 480, 1.00, "entry"],
+  ["morgana", 5.67, 671, 383, 0.76, "entry"],
+];

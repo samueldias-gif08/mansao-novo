@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<base href="/">
+<title>Teste da Morgana</title>
+<canvas width="960" height="540"></canvas>
+<pre id="resultado">Executando…</pre>
+<script src="src/config.js"></script>
+<script src="src/constantes.js"></script>
+<script src="src/recursos.js"></script>
+<script src="src/animator.js"></script>
+<script src="src/controles.js"></script>
+<script src="src/particulas.js"></script>
+<script src="src/audio.js"></script>
+<script src="src/projetil.js"></script>
+<script src="src/fighter.js"></script>
+<script src="src/selecao.js"></script>
+<script src="src/jogo.js"></script>
+<script>
+"use strict";
+async function testar() {
+  const recursos = new Recursos(await carregarManifest());
+  await recursos.precarregar();
+  const jogo = new Jogo(document.querySelector("canvas"), recursos, null, {}, { tocar() {} });
+  function exigir(condicao, mensagem) {
+    if (!condicao) throw new Error(mensagem);
+  }
+  jogo._iniciarSelect();
+  const indice = SELECT_CELULAS.findIndex((celula) => celula.pers === "morgana");
+  for (const slot of ["p1", "p2"]) {
+    const { x, y, w, h } = jogo._retCelulaSelect(indice);
+    const area = jogo.canvas.getBoundingClientRect();
+    jogo.canvas.dispatchEvent(new MouseEvent("click", {
+      clientX: area.left + (x + w / 2) * area.width / LARGURA,
+      clientY: area.top + (y + h / 2) * area.height / ALTURA,
+    }));
+    exigir(jogo.confirmado[slot] && PERSONAGENS[jogo.escolha[slot]] === "morgana", "Seleção por clique " + slot);
+  }
+  exigir(recursos.retrato("morgana")?.naturalWidth > 0, "Retrato carregado");
+  exigir(recursos.ficha("morgana").estilo === "Jiu-Jitsu", "Ficha carregada");
+  for (const [nome, animacao] of Object.entries(recursos.dados.morgana)) {
+    exigir(animacao.meta.framesReais === animacao.meta.frames, "Quadros disponíveis: " + nome);
+    exigir(animacao.frames.every(({ img }) => img.naturalWidth === 256 && img.naturalHeight === 256), "Dimensões: " + nome);
+  }
+  const indiceMorgana = jogo.escolha.p1;
+  function reset(slot, distancia = 85, rival = 0) {
+    jogo.escolha.p1 = slot === "p1" ? indiceMorgana : rival;
+    jogo.escolha.p2 = slot === "p2" ? indiceMorgana : rival;
+    jogo.projeteis = [];
+    jogo._criarLutadores();
+    jogo.p1.x = 400;
+    jogo.p2.x = 400 + distancia;
+    return [jogo[slot], jogo[slot === "p1" ? "p2" : "p1"]];
+  }
+  function tecla(slot, acao, pressionada = true) {
+    window.dispatchEvent(new KeyboardEvent(pressionada ? "keydown" : "keyup", { code: TECLAS[slot][acao] }));
+  }
+  function apertar(slot, acao) {
+    tecla(slot, acao);
+    tecla(slot, acao, false);
+  }
+  function quadros(n) {
+    for (let i = 0; i < n; i++) {
+      jogo.p1.atualizar(1 / 60, true);
+      jogo.p2.atualizar(1 / 60, true);
+      jogo._resolverColisaoCorpos();
+      jogo._resolverThrowTech();
+      jogo._resolverGolpes();
+      jogo._atualizarProjeteis(1 / 60);
+    }
+  }
+  const estados = {
+    esquerda: ESTADOS.WALK, direita: ESTADOS.WALK, pula: ESTADOS.JUMP,
+    agacha: ESTADOS.CROUCH, soco: ESTADOS.PUNCH, chute: ESTADOS.KICK,
+    projetil: ESTADOS.FIREBALL, agarra: ESTADOS.GRAB, especial: ESTADOS.SPECIAL,
+    defende: ESTADOS.BLOCK, provoca: ESTADOS.LIGHTNING,
+  };
+  const ctx = jogo.ctx;
+  const [sprite] = reset("p1");
+  function pixelsMorgana(lado, frame) {
+    ctx.clearRect(0, 0, LARGURA, ALTURA);
+    sprite.facing = lado;
+    sprite.anim.frame = frame;
+    sprite.desenhar(ctx, false);
+    return ctx.getImageData(sprite.x - 128, sprite.y - 256, 256, 235).data;
+  }
+  const direita = pixelsMorgana(1, 0);
+  const esquerda = pixelsMorgana(-1, 0);
+  const aberta = pixelsMorgana(1, 3);
+  let opacos = 0, espelhados = 0, diferentes = 0;
+  for (let y = 0; y < 235; y++) for (let x = 0; x < 256; x++) {
+    const i = (y * 256 + x) * 4 + 3;
+    if (Math.abs(direita[i] - aberta[i]) > 150) diferentes++;
+    if (direita[i] < 150) continue;
+    opacos++;
+    if (esquerda[(y * 256 + 255 - x) * 4 + 3] >= 150) espelhados++;
+  }
+  exigir(opacos > 2000 && espelhados / opacos > 0.96 && diferentes > 400, "Espelhamento e pose de asas");
+  exigir(sprite.hurtbox().w < 80, "Asas fora da hurtbox");
+
+  for (const slot of ["p1", "p2"]) {
+    for (const [acao, estado] of Object.entries(estados)) {
+      const [f] = reset(slot);
+      tecla(slot, acao);
+      quadros(1);
+      exigir(f.estado === estado && f.hp === 90, slot + " " + acao);
+      tecla(slot, acao, false);
+      quadros(150);
+      exigir(f.estado === ESTADOS.IDLE && f.y === CHAO_Y, "Recuperacao " + slot + " " + acao);
+    }
+
+    let [f, alvo] = reset(slot, 74);
+    let socos = 0;
+    const recebe = alvo.receberGolpe.bind(alvo);
+    alvo.receberGolpe = (info) => { socos++; return recebe(info); };
+    apertar(slot, "soco");
+    quadros(7);
+    exigir(socos === 1 && f.golpeAtual === "punch_triple", "Primeiro soco " + slot);
+    apertar(slot, "soco");
+    quadros(7);
+    exigir(socos === 2, "Segundo soco sem reiniciar " + slot);
+    quadros(10);
+    exigir(socos === 3 && alvo.hp < alvo.vidaMax - 9, "Terceiro soco " + slot);
+    quadros(45);
+    exigir(socos === 3 && f.estado === ESTADOS.IDLE, "Sequencia aplica tres impactos e termina " + slot);
+
+    [f, alvo] = reset(slot, 94);
+    apertar(slot, "agarra");
+    quadros(12);
+    exigir(alvo.estado === ESTADOS.CAPTURED && alvo.hp === alvo.vidaMax, "Captura tecnica " + slot);
+    quadros(12);
+    exigir(alvo.estado === ESTADOS.CAPTURED && alvo.anguloCaptura !== 0 && alvo.y > CHAO_Y - 30,
+      "Projecao baixa e imobilizacao " + slot);
+    quadros(15);
+    exigir(!f.captura && alvo.estado === ESTADOS.KNOCKDOWN && alvo.hp === alvo.vidaMax - 14,
+      "Libera apos projecao " + slot);
+
+    [f, alvo] = reset(slot, 94);
+    apertar(slot, "agarra");
+    quadros(12);
+    f.receberGolpe({ dano: 4, knockback: 50, origemX: alvo.x });
+    quadros(2);
+    exigir(!f.captura && alvo.estado !== ESTADOS.CAPTURED && alvo.hp === alvo.vidaMax,
+      "Interrupcao libera alvo " + slot);
+
+    [f, alvo] = reset(slot, 235);
+    apertar(slot, "projetil");
+    quadros(12);
+    exigir(jogo.projeteis[0]?.forma === "orbe-carmesim" && jogo.projeteis[0].facing === f.facing, "Orbe espelhado " + slot);
+    quadros(40);
+    exigir(alvo.hp === alvo.vidaMax - 9, "Orbe acerta " + slot);
+
+    [f, alvo] = reset(slot, 155);
+    const inicio = alvo.x;
+    const lado = f.facing;
+    apertar(slot, "especial");
+    quadros(80);
+    exigir((alvo.x - inicio) * lado > 90 && alvo.hp === alvo.vidaMax - 2 && jogo.projeteis.length === 0,
+      "Vendaval empurra e nao cria projetil " + slot);
+    apertar(slot, "especial");
+    quadros(1);
+    exigir(!f.podeUsarEspecial() && f.estado === ESTADOS.IDLE, "Recarga do vento " + slot);
+    quadros(240);
+    exigir(f.podeUsarEspecial(), "Vento recupera " + slot);
+
+    [f, alvo] = reset(slot, 155);
+    const posicaoGuarda = alvo.x;
+    tecla(alvo.slot, "defende");
+    apertar(slot, "especial");
+    quadros(50);
+    exigir(alvo.hp === alvo.vidaMax && Math.abs(alvo.x - posicaoGuarda) < 26,
+      "Defesa reduz empurrao " + slot);
+    tecla(alvo.slot, "defende", false);
+
+    [f, alvo] = reset(slot, 130);
+    alvo.x = lado > 0 ? MUNDO_L - 47 : 47;
+    f.x = alvo.x - lado * 130;
+    apertar(slot, "especial");
+    quadros(60);
+    exigir(alvo.x >= 40 && alvo.x <= MUNDO_L - 40, "Vendaval respeita parede " + slot);
+
+    [f, alvo] = reset(slot, 235);
+    const centro = alvo.x;
+    apertar(slot, "provoca");
+    quadros(15);
+    const centros = f.raios.map((r) => r.x);
+    exigir(centros[0] === centro && f.raios.every((r) => !r.atingiu) && alvo.hp === alvo.vidaMax,
+      "Marca antes do dano " + slot);
+    ctx.clearRect(0, 0, LARGURA, ALTURA);
+    f.desenhar(ctx, false);
+    const aviso = ctx.getImageData(centro - 15, 65, 30, 380).data;
+    exigir(aviso.some((v, i) => i % 4 === 3 && v > 70), "Aviso renderizado " + slot);
+    quadros(12);
+    exigir(f.raios[0].atingiu && alvo.hp === alvo.vidaMax - 11, "Primeiro raio acerta " + slot);
+    ctx.clearRect(0, 0, LARGURA, ALTURA);
+    f.desenhar(ctx, false);
+    const topo = ctx.getImageData(centro - 22, 0, 44, 60).data;
+    exigir(topo.some((v, i) => i % 4 === 3 && v > 100), "Raio desenhado do alto " + slot);
+    const perfilRaio = ctx.getImageData(centro - 35, 26, 70, 1).data;
+    const espessura = perfilRaio.filter((v, i) => i % 4 === 3 && v > 125).length;
+    exigir(espessura >= 20, "Tronco luminoso e grosso " + slot);
+    quadros(40);
+    exigir(f.raios.every((r) => r.atingiu) && alvo.hp === alvo.vidaMax - 11,
+      "Tres descargas, sem dano repetido " + slot);
+    quadros(20);
+    exigir(!f.raios.length && f.estado === ESTADOS.IDLE && f.recargaRaios > 0, "Efeito termina " + slot);
+
+    [f, alvo] = reset(slot, 235);
+    apertar(slot, "provoca");
+    quadros(12);
+    const travado = f.raios[0].x;
+    alvo.x += lado * 207;
+    quadros(47);
+    exigir(f.raios[0].x === travado && alvo.hp === alvo.vidaMax, "Alvo pode escapar das marcas " + slot);
+    jogo.faseRound = "lutando";
+    jogo._encerrarRound(alvo.slot, false);
+    exigir(f.raios.length === 0, "Fim de round limpa a tempestade " + slot);
+
+    [f, alvo] = reset(slot, 235);
+    tecla(alvo.slot, "defende");
+    apertar(slot, "provoca");
+    quadros(30);
+    exigir(alvo.hp === alvo.vidaMax - 1, "Raio bloqueado causa apenas chip " + slot);
+    tecla(alvo.slot, "defende", false);
+  }
+  const [vencedora] = reset("p1");
+  jogo.faseRound = "lutando";
+  jogo._encerrarRound("p1", false);
+  for (let i = 0; i < 34; i++) vencedora.atualizar(1 / 60, false);
+  ctx.clearRect(0, 0, LARGURA, ALTURA);
+  vencedora.desenhar(ctx, false);
+  exigir(vencedora.anim.anim === "victory" && vencedora.perfil.fraseVitoria.includes("rainha") &&
+    ctx.getImageData(vencedora.x - 125, 0, 30, 50).data.some((v, i) => i % 4 === 3 && v > 70),
+    "Vitoria com raio e frase");
+
+  jogo.escolha.p1 = jogo.escolha.p2 = indiceMorgana;
+  jogo._criarLutadores();
+  apertar("p1", "provoca");
+  quadros(1);
+  exigir(jogo.p1.raios.length === 3 && jogo.p2.raios.length === 0, "Tempestades independentes");
+  apertar("p2", "provoca");
+  quadros(1);
+  exigir(jogo.p2.raios.length === 3 && jogo.p1.raios !== jogo.p2.raios, "Duas Morgana simultaneas");
+
+  jogo.modo = "1p";
+  const aleatorio = Math.random;
+  try {
+    Math.random = () => 0;
+    const [cpu] = reset("p2", 170);
+    quadros(1);
+    exigir(cpu.estado === ESTADOS.LIGHTNING, "CPU invoca raios");
+  } finally { Math.random = aleatorio; }
+  document.querySelector("#resultado").textContent = "PASSOU";
+}
+testar().catch((erro) => {
+  document.querySelector("#resultado").textContent = "FALHOU: " + erro.message;
+});
+</script>
+</html>

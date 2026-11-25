@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<base href="/">
+<title>Teste da Belyx</title>
+<canvas width="960" height="540"></canvas>
+<pre id="resultado">Executando…</pre>
+<script src="src/config.js"></script>
+<script src="src/constantes.js"></script>
+<script src="src/recursos.js"></script>
+<script src="src/animator.js"></script>
+<script src="src/controles.js"></script>
+<script src="src/particulas.js"></script>
+<script src="src/audio.js"></script>
+<script src="src/projetil.js"></script>
+<script src="src/fighter.js"></script>
+<script src="src/selecao.js"></script>
+<script src="src/jogo.js"></script>
+<script>
+"use strict";
+async function testar() {
+  const recursos = new Recursos(await carregarManifest());
+  await recursos.precarregar();
+  const jogo = new Jogo(document.querySelector("canvas"), recursos, null, {}, { tocar() {} });
+  function exigir(condicao, mensagem) {
+    if (!condicao) throw new Error(mensagem);
+  }
+  jogo._iniciarSelect();
+  const indice = SELECT_CELULAS.findIndex((celula) => celula.pers === "belyx");
+  for (const slot of ["p1", "p2"]) {
+    const { x, y, w, h } = jogo._retCelulaSelect(indice);
+    const area = jogo.canvas.getBoundingClientRect();
+    jogo.canvas.dispatchEvent(new MouseEvent("click", {
+      clientX: area.left + (x + w / 2) * area.width / LARGURA,
+      clientY: area.top + (y + h / 2) * area.height / ALTURA,
+    }));
+    exigir(jogo.confirmado[slot] && PERSONAGENS[jogo.escolha[slot]] === "belyx", "Seleção por clique " + slot);
+  }
+  exigir(recursos.retrato("belyx")?.naturalWidth > 0, "Retrato carregado");
+  exigir(recursos.ficha("belyx").estilo === "Muay Thai", "Ficha carregada");
+  for (const [nome, animacao] of Object.entries(recursos.dados.belyx)) {
+    exigir(animacao.meta.framesReais === animacao.meta.frames, "Quadros disponíveis: " + nome);
+    exigir(animacao.frames.every(({ img }) => img.naturalWidth === 256 && img.naturalHeight === 256), "Dimensões: " + nome);
+  }
+  const indiceAndroid = jogo.escolha.p1;
+  function reset(slot, distancia = 85) {
+    jogo.escolha.p1 = slot === "p1" ? indiceAndroid : 0;
+    jogo.escolha.p2 = slot === "p2" ? indiceAndroid : 0;
+    jogo.projeteis = [];
+    jogo._criarLutadores();
+    jogo.p1.x = 400;
+    jogo.p2.x = 400 + distancia;
+    return [jogo[slot], jogo[slot === "p1" ? "p2" : "p1"]];
+  }
+  function tecla(slot, acao, pressionada = true) {
+    window.dispatchEvent(new KeyboardEvent(pressionada ? "keydown" : "keyup", { code: TECLAS[slot][acao] }));
+  }
+  function apertar(slot, acao) {
+    tecla(slot, acao);
+    tecla(slot, acao, false);
+  }
+  function quadros(n) {
+    for (let i = 0; i < n; i++) {
+      jogo.p1.atualizar(1 / 60, true);
+      jogo.p2.atualizar(1 / 60, true);
+      jogo._resolverColisaoCorpos();
+      jogo._resolverGolpes();
+      jogo._atualizarProjeteis(1 / 60);
+    }
+  }
+  const estados = {
+    esquerda: ESTADOS.WALK, direita: ESTADOS.WALK, pula: ESTADOS.JUMP,
+    agacha: ESTADOS.CROUCH, soco: ESTADOS.PUNCH, chute: ESTADOS.KICK,
+    projetil: ESTADOS.FIREBALL, agarra: ESTADOS.GRAB, especial: ESTADOS.TELEPORT,
+    defende: ESTADOS.BLOCK, provoca: ESTADOS.SHADOW_GUARD,
+  };
+  for (const slot of ["p1", "p2"]) {
+    for (const [acao, estado] of Object.entries(estados)) {
+      const [lutador] = reset(slot);
+      exigir(lutador.hp === 88, "Vida inicial " + slot);
+      lutador.especial = CONFIG.especial.custo;
+      tecla(slot, acao);
+      quadros(1);
+      exigir(lutador.estado === estado, slot + " " + acao);
+      tecla(slot, acao, false);
+      quadros(150);
+      exigir(lutador.estado === ESTADOS.IDLE && lutador.y === CHAO_Y, "Recuperação " + slot + " " + acao);
+    }
+    let [lutador, alvo] = reset(slot, 220);
+    const lado = lutador.facing;
+    apertar(slot, "especial");
+    quadros(20);
+    exigir(Math.sign(lutador.x - alvo.x) === lado && lutador.facing === -lado, "Teleporte atr?s do alvo " + slot);
+    exigir(!colideAABB(lutador.hurtbox(), alvo.hurtbox()) && lutador.y === CHAO_Y, "Destino livre no ch?o " + slot);
+    apertar(slot, "especial");
+    quadros(1);
+    exigir(lutador.estado === ESTADOS.IDLE, "Recarga do teleporte " + slot);
+
+    [lutador, alvo] = reset(slot, 220);
+    alvo.x = slot === "p1" ? MUNDO_L - 40 : 40;
+    lutador.x = alvo.x - lutador.facing * 150;
+    const origem = lutador.x;
+    apertar(slot, "especial");
+    quadros(20);
+    exigir(lutador.x === origem, "Respeita parede sem empurrar o alvo " + slot);
+
+    [lutador, alvo] = reset(slot);
+    apertar(slot, "provoca");
+    apertar(alvo.slot, "soco");
+    quadros(10);
+    exigir(lutador.hp === 88 && lutador.estado === ESTADOS.SHADOW_GUARD, "Manto bloqueia dano " + slot);
+    quadros(30);
+    apertar(slot, "provoca");
+    quadros(1);
+    exigir(lutador.estado === ESTADOS.IDLE, "Manto expira e entra em recarga " + slot);
+
+    [lutador, alvo] = reset(slot);
+    apertar(slot, "provoca");
+    apertar(alvo.slot, "agarra");
+    quadros(15);
+    exigir(lutador.hp < 88 && lutador.estado === ESTADOS.KNOCKDOWN, "Agarr?o vence o manto " + slot);
+
+    [lutador, alvo] = reset(slot, 270);
+    apertar(slot, "projetil");
+    quadros(12);
+    exigir(jogo.projeteis[0]?.forma === "orbe-sombrio" && jogo.projeteis[0].facing === lutador.facing,
+      "Orbe espelhado " + slot);
+    quadros(37);
+    exigir(alvo.hp === alvo.vidaMax - 10, "Orbe Sombrio causa dano " + slot);
+
+    [lutador, alvo] = reset(slot, 74);
+    apertar(slot, "soco");
+    quadros(6);
+    exigir(lutador.janelaCancel > 0 && alvo.hp < alvo.vidaMax, "Jab conecta " + slot);
+    apertar(slot, "soco");
+    quadros(6);
+    exigir(lutador.golpeAtual === "punch_elbow" && lutador.janelaCancel > 0, "Cotovelo conecta " + slot);
+    apertar(slot, "chute");
+    quadros(7);
+    exigir(lutador.golpeAtual === "kick_knee" && lutador.comboContador === 3, "Encadeia a joelhada " + slot);
+
+    [lutador, alvo] = reset(slot);
+    tecla(alvo.slot, "defende");
+    apertar(slot, "soco");
+    quadros(10);
+    exigir(alvo.hp === alvo.vidaMax, "Guarda alta bloqueia o jab " + slot);
+    quadros(25);
+    apertar(slot, "agarra");
+    quadros(15);
+    exigir(alvo.hp === alvo.vidaMax - 13 && alvo.estado === ESTADOS.KNOCKDOWN, "Aperto Noturno " + slot);
+    tecla(alvo.slot, "defende", false);
+
+    [lutador, alvo] = reset(slot, 100);
+    apertar(slot, "chute");
+    quadros(14);
+    exigir(alvo.hp === alvo.vidaMax - 12, "Chute circular causa dano " + slot);
+
+  }
+  document.querySelector("#resultado").textContent = "PASSOU";
+}
+testar().catch((erro) => {
+  document.querySelector("#resultado").textContent = "FALHOU: " + erro.message;
+});
+</script>
+</html>

@@ -1,0 +1,88 @@
+{
+  "nome": "ANDROID 6.7",
+  "retrato": "android67.png",
+  "ficha": {
+    "estilo": "Boxe",
+    "lore": ["Guarda alta e combinações rápidas.", "Pulso Digital e Laser Real abrem distância."],
+    "atributos": {
+      "forca": 4.1,
+      "velocidade": 4.25,
+      "defesa": 3.9,
+      "especial": 4.6
+    },
+    "dificuldade": 4
+  },
+  "combate": {
+    "vida": 90,
+    "velocidade": 1.08,
+    "caminhada": 0.22,
+    "maxCombo": 4,
+    "socos": ["punch", "punch_step", "punch_cross", "punch_hook"],
+    "avancoAgarrar": 85,
+    "hurtboxes": { "normal": [65, 194], "baixa": [83, 132] },
+    "voo": { "duracao": 2, "altura": 108, "velocidade": 155 },
+    "projetil": {
+      "fireball": {
+        "nome": "Pulso Digital",
+        "dano": 9,
+        "vel": 520,
+        "cor": "#8cecff",
+        "raio": 17,
+        "origem": [91, -160],
+        "tempoVida": 2
+      },
+      "super": {
+        "nome": "Laser Real",
+        "forma": "laser",
+        "dano": 24,
+        "vel": 0,
+        "alcance": 540,
+        "cor": "#85deff",
+        "raio": 9,
+        "origem": [17, -159],
+        "tempoVida": 0.2
+      }
+    }
+  },
+  "animacoes": {
+    "entry": { "frames": 6, "fps": 12, "loop": false, "poses": [15, 15, 5, 6, 13, 0] },
+    "idle": { "frames": 8, "fps": 10, "loop": true, "poses": [0, 0, 0, 13, 0, 0, 0, 0] },
+    "walk_forward": { "frames": 6, "fps": 13, "loop": true, "poses": [0, 1, 1, 0, 2, 2] },
+    "walk": { "frames": 6, "fps": 12, "loop": true, "poses": [2, 2, 0, 1, 1, 0] },
+    "run": { "frames": 6, "fps": 17, "loop": true, "poses": [1, 3, 3, 1, 2, 3] },
+    "jump": { "frames": 6, "fps": 16, "loop": false, "poses": [6, 4, 4, 4, 4, 4] },
+    "fall": { "frames": 5, "fps": 15, "loop": false, "poses": [4, 5, 5, 5, 5] },
+    "land": { "frames": 4, "fps": 24, "loop": false, "poses": [6, 6, 13, 0] },
+    "crouch": { "frames": 4, "fps": 22, "loop": false, "poses": [13, 6, 6, 6] },
+    "punch": { "frames": 6, "fps": 26, "loop": false, "poses": [0, 13, 7, 7, 13, 0] },
+    "punch_step": { "frames": 7, "fps": 26, "loop": false, "poses": [1, 1, 8, 8, 8, 13, 0] },
+    "punch_cross": { "frames": 7, "fps": 26, "loop": false, "poses": [0, 2, 8, 8, 8, 13, 0] },
+    "punch_hook": { "frames": 8, "fps": 26, "loop": false, "poses": [13, 2, 9, 9, 9, 9, 13, 0] },
+    "soco_baixo": { "frames": 6, "fps": 24, "loop": false, "poses": [6, 6, 9, 9, 6, 6] },
+    "kick": { "frames": 9, "fps": 24, "loop": false, "poses": [0, 4, 4, 10, 10, 10, 4, 13, 0] },
+    "kick_jump": { "frames": 8, "fps": 24, "loop": false, "poses": [4, 4, 10, 10, 10, 5, 5, 5] },
+    "fireball": { "frames": 10, "fps": 24, "loop": false, "poses": [0, 13, 13, 11, 11, 11, 11, 13, 13, 0] },
+    "grab": { "frames": 10, "fps": 24, "loop": false, "poses": [0, 1, 12, 12, 12, 9, 9, 13, 13, 0] },
+    "throw_tech": { "frames": 6, "fps": 22, "loop": false, "poses": [12, 14, 14, 2, 13, 0] },
+    "special": { "frames": 15, "fps": 24, "loop": false, "poses": [0, 0, 13, 13, 15, 11, 11, 11, 11, 11, 11, 13, 13, 0, 0] },
+    "block": { "frames": 4, "fps": 22, "loop": false, "poses": [0, 13, 13, 13] },
+    "block_low": { "frames": 4, "fps": 22, "loop": false, "poses": [13, 6, 6, 6] },
+    "hit": { "frames": 5, "fps": 22, "loop": false, "poses": [14, 14, 14, 13, 0] },
+    "knockdown": { "frames": 9, "fps": 20, "loop": false, "poses": [14, 14, 16, 16, 16, 16, 16, 16, 16] },
+    "getup": { "frames": 9, "fps": 22, "loop": false, "poses": [16, 16, 6, 6, 6, 13, 13, 0, 0] },
+    "ko": { "frames": 9, "fps": 20, "loop": false, "poses": [14, 14, 16, 16, 16, 16, 16, 16, 16] },
+    "victory": { "frames": 10, "fps": 14, "loop": false, "poses": [0, 0, 13, 15, 15, 15, 15, 15, 15, 15] },
+    "defeat": { "frames": 8, "fps": 16, "loop": false, "poses": [0, 14, 14, 6, 6, 6, 6, 6] },
+    "flight": { "frames": 12, "fps": 12, "loop": true, "poses": [15, 15, 15, 15, 15, 15, 17, 17, 17, 17, 17, 17] }
+  },
+  "golpes": {
+    "punch": { "startup": 4, "ativo": 4, "dano": 5, "knockback": 69, "alcance": [14, 103] },
+    "punch_step": { "startup": 5, "ativo": 4, "dano": 7, "knockback": 82, "alcance": [14, 106] },
+    "punch_cross": { "startup": 5, "ativo": 4, "recovery": 8, "dano": 7, "knockback": 78, "alcance": [14, 105], "altura": [-174, -120], "cancelavel": true, "tipo_altura": "alto" },
+    "punch_hook": { "startup": 6, "ativo": 4, "recovery": 12, "dano": 9, "knockback": 142, "alcance": [12, 96], "altura": [-171, -112], "cancelavel": false, "tipo_altura": "alto" },
+    "kick": { "startup": 8, "ativo": 5, "dano": 9 },
+    "agarra": { "startup": 8, "ativo": 5, "dano": 12, "alcance": [8, 88], "alvoNoChao": true },
+    "fireball": { "startup": 10, "ativo": 5 },
+    "super": { "startup": 14, "ativo": 6 }
+  }
+}

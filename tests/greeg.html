@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<base href="/">
+<title>Teste da Greeg</title>
+<canvas width="960" height="540"></canvas>
+<pre id="resultado">Executando…</pre>
+<script src="src/config.js"></script>
+<script src="src/constantes.js"></script>
+<script src="src/recursos.js"></script>
+<script src="src/animator.js"></script>
+<script src="src/controles.js"></script>
+<script src="src/particulas.js"></script>
+<script src="src/audio.js"></script>
+<script src="src/projetil.js"></script>
+<script src="src/fighter.js"></script>
+<script src="src/selecao.js"></script>
+<script src="src/jogo.js"></script>
+<script>
+"use strict";
+async function testar() {
+  const recursos = new Recursos(await carregarManifest());
+  await recursos.precarregar();
+  const jogo = new Jogo(document.querySelector("canvas"), recursos, null, {}, { tocar() {} });
+  function exigir(condicao, mensagem) {
+    if (!condicao) throw new Error(mensagem);
+  }
+  jogo._iniciarSelect();
+  const indice = SELECT_CELULAS.findIndex((celula) => celula.pers === "greeg");
+  for (const slot of ["p1", "p2"]) {
+    const { x, y, w, h } = jogo._retCelulaSelect(indice);
+    const area = jogo.canvas.getBoundingClientRect();
+    jogo.canvas.dispatchEvent(new MouseEvent("click", {
+      clientX: area.left + (x + w / 2) * area.width / LARGURA,
+      clientY: area.top + (y + h / 2) * area.height / ALTURA,
+    }));
+    exigir(jogo.confirmado[slot] && PERSONAGENS[jogo.escolha[slot]] === "greeg", "Seleção por clique " + slot);
+  }
+  exigir(recursos.retrato("greeg")?.naturalWidth > 0, "Retrato carregado");
+  exigir(recursos.ficha("greeg").estilo === "Luta livre", "Ficha carregada");
+  for (const [nome, animacao] of Object.entries(recursos.dados.greeg)) {
+    exigir(animacao.meta.framesReais === animacao.meta.frames, "Quadros disponíveis: " + nome);
+    exigir(animacao.frames.every(({ img }) => img.naturalWidth === 256 && img.naturalHeight === 256), "Dimensões: " + nome);
+  }
+  const indiceGreeg = jogo.escolha.p1;
+  function reset(slot, distancia = 85, rival = 0) {
+    jogo.escolha.p1 = slot === "p1" ? indiceGreeg : rival;
+    jogo.escolha.p2 = slot === "p2" ? indiceGreeg : rival;
+    jogo.projeteis = [];
+    jogo._criarLutadores();
+    jogo.p1.x = 400;
+    jogo.p2.x = 400 + distancia;
+    return [jogo[slot], jogo[slot === "p1" ? "p2" : "p1"]];
+  }
+  function tecla(slot, acao, pressionada = true) {
+    window.dispatchEvent(new KeyboardEvent(pressionada ? "keydown" : "keyup", { code: TECLAS[slot][acao] }));
+  }
+  function apertar(slot, acao) {
+    tecla(slot, acao);
+    tecla(slot, acao, false);
+  }
+  function quadros(n) {
+    for (let i = 0; i < n; i++) {
+      jogo.p1.atualizar(1 / 60, true);
+      jogo.p2.atualizar(1 / 60, true);
+      jogo._resolverColisaoCorpos();
+      jogo._resolverThrowTech();
+      jogo._resolverGolpes();
+      jogo._atualizarProjeteis(1 / 60);
+    }
+  }
+  const estados = {
+    esquerda: ESTADOS.WALK, direita: ESTADOS.WALK, pula: ESTADOS.JUMP,
+    agacha: ESTADOS.CROUCH, soco: ESTADOS.PUNCH, chute: ESTADOS.KICK,
+    projetil: ESTADOS.FIREBALL, agarra: ESTADOS.GRAB, especial: ESTADOS.SHELL_GUARD,
+    defende: ESTADOS.BLOCK, provoca: ESTADOS.FIREBALL,
+  };
+  const [sprite] = reset("p1");
+  function silhueta(lado) {
+    const ctx = jogo.ctx;
+    sprite.facing = lado;
+    ctx.clearRect(0, 0, LARGURA, ALTURA);
+    sprite.desenhar(ctx, false);
+    return ctx.getImageData(sprite.x - 128, sprite.y - 256, 256, 235).data;
+  }
+  const normal = silhueta(1), espelho = silhueta(-1);
+  let opacos = 0, iguais = 0;
+  for (let y = 0; y < 235; y++) for (let x = 0; x < 256; x++) {
+    if (normal[(y * 256 + x) * 4 + 3] < 150) continue;
+    opacos++;
+    if (espelho[(y * 256 + 255 - x) * 4 + 3] >= 150) iguais++;
+  }
+  exigir(opacos > 2000 && opacos < 36000 && iguais / opacos > 0.95, "Sprite transparente e espelhado");
+  for (const slot of ["p1", "p2"]) {
+    for (const [acao, estado] of Object.entries(estados)) {
+      const [f] = reset(slot);
+      tecla(slot, acao);
+      quadros(1);
+      exigir(f.estado === estado && f.hp === 100, slot + " " + acao);
+      tecla(slot, acao, false);
+      quadros(215);
+      exigir(f.estado === ESTADOS.IDLE && f.y === CHAO_Y, "Recuperacao " + slot + " " + acao);
+    }
+
+    let [f, alvo] = reset(slot, 103, indiceGreeg);
+    apertar(slot, "especial");
+    quadros(1);
+    exigir(f.estado === ESTADOS.SHELL_GUARD && f.anim.anim === "shell_guard" && f.estadoTempo === 0,
+      "Casco disponivel no inicio " + slot);
+    const automatizado = { dano: 100, knockback: 800, origemX: alvo.x, derruba: true };
+    for (const extras of [{ tipoAltura: "alto" }, { tipoAltura: "baixo" },
+      { ignoraBloqueio: true }, { tipoAltura: "medio" }]) {
+      exigir(f.receberGolpe({ ...automatizado, ...extras }).bloqueado && f.hp === 100 && f.vx === 0,
+        "Protecao absoluta " + slot);
+    }
+    let golpesBloqueados = 0;
+    const receber = f.receberGolpe.bind(f);
+    f.receberGolpe = (info) => { golpesBloqueados++; return receber(info); };
+    for (const ataque of ["soco", "chute", "agarra", "projetil", "provoca"]) {
+      alvo.irPara(ESTADOS.IDLE, true);
+      alvo.x = f.x - alvo.facing * 92;
+      alvo.vx = 0;
+      const total = golpesBloqueados;
+      apertar(alvo.slot, ataque);
+      apertar(slot, ataque);
+      quadros(30);
+      exigir(golpesBloqueados > total && f.estado === ESTADOS.SHELL_GUARD && f.hp === 100 && !f.captura,
+        "Casco neutraliza " + ataque + " e impede contra-ataque " + slot);
+    }
+    quadros(30);
+    exigir(f.estado === ESTADOS.SHELL_EXIT && f.anim.anim === "shell_exit" && Math.abs(f.recargaCasco - 12) < 0.02,
+      "Sai do casco em 3 s " + slot);
+    const res = f.receberGolpe({ ...automatizado, dano: 10, derruba: false });
+    exigir(!res.bloqueado && f.hp === 90, "Vulneravel durante a saida " + slot);
+    quadros(40);
+    apertar(slot, "especial");
+    quadros(1);
+    exigir(f.estado !== ESTADOS.SHELL_GUARD && !f.podeUsarEspecial(), "Recarga bloqueia reativacao " + slot);
+    quadros(690);
+    exigir(f.podeUsarEspecial(), "Recarga completa " + slot);
+    apertar(slot, "especial");
+    quadros(1);
+    exigir(f.estado === ESTADOS.SHELL_GUARD, "Casco reativa " + slot);
+    jogo._iniciarRound();
+    exigir(f.estado !== ESTADOS.SHELL_GUARD && f.recargaCasco === 0, "Reinicio limpa protecao " + slot);
+
+    [f, alvo] = reset(slot, 137, PERSONAGENS.indexOf("carter"));
+    let impactosEspeciais = 0;
+    const absorver = f.receberGolpe.bind(f);
+    f.receberGolpe = (info) => { impactosEspeciais++; return absorver(info); };
+    apertar(slot, "especial");
+    apertar(alvo.slot, "especial");
+    quadros(70);
+    exigir(impactosEspeciais > 0 && f.hp === 100, "Casco bloqueia Patrulha Bumerangue " + slot);
+
+    [f, alvo] = reset(slot, 99);
+    const lado = f.facing;
+    apertar(slot, "agarra");
+    quadros(12);
+    exigir(alvo.estado === ESTADOS.CAPTURED && alvo.hp === alvo.vidaMax, "Captura sem dano antecipado " + slot);
+    quadros(8);
+    exigir(alvo.y < CHAO_Y - 70 && alvo.anguloCaptura !== 0, "Suplex levanta e gira o alvo " + slot);
+    quadros(14);
+    exigir(alvo.estado === ESTADOS.KNOCKDOWN && alvo.hp === alvo.vidaMax - 17 &&
+      (f.x - alvo.x) * lado > 0 && !f.captura, "Suplex aplica dano no impacto e solta " + slot);
+    quadros(90);
+    exigir(alvo.estado === ESTADOS.IDLE, "Alvo se recupera " + slot);
+    [f, alvo] = reset(slot, 99);
+    apertar(slot, "agarra");
+    quadros(17);
+    f.receberGolpe({ dano: 4, knockback: 60, origemX: alvo.x });
+    quadros(3);
+    exigir(!f.captura && alvo.estado !== ESTADOS.CAPTURED && alvo.hp === alvo.vidaMax,
+      "Interrupcao libera alvo sem dano " + slot);
+
+    [f, alvo] = reset(slot, 245);
+    apertar(slot, "projetil");
+    quadros(14);
+    exigir(jogo.projeteis[0]?.forma === "batida-grave" && jogo.projeteis[0].facing === f.facing, "Batida espelhada " + slot);
+    quadros(38);
+    exigir(alvo.hp === alvo.vidaMax - 10, "Batida Concentrada acerta " + slot);
+
+    [f, alvo] = reset(slot, 75);
+    apertar(slot, "soco");
+    quadros(9);
+    exigir(f.janelaCancel > 0 && alvo.hp === alvo.vidaMax - 8, "Direto abre combo " + slot);
+    apertar(slot, "soco");
+    quadros(9);
+    exigir(f.golpeAtual === "forearm" && f.janelaCancel > 0, "Antebraco no combo " + slot);
+    apertar(slot, "chute");
+    quadros(10);
+    exigir(f.golpeAtual === "kick_stomp" && f.comboContador === 3, "Pisão encerra combo " + slot);
+
+    [f, alvo] = reset(slot, 245);
+    apertar(slot, "provoca");
+    quadros(15);
+    exigir(jogo.projeteis[0]?.raio === 39 && jogo.projeteis[0].facing === f.facing, "Onda maior e espelhada " + slot);
+    quadros(40);
+    exigir(alvo.hp === alvo.vidaMax - 13, "Grave 171 acerta uma vez " + slot);
+    apertar(slot, "provoca");
+    quadros(1);
+    exigir(f.estado === ESTADOS.IDLE, "Recarga do Grave 171 " + slot);
+    [f, alvo] = reset(slot, 580);
+    apertar(slot, "provoca");
+    quadros(82);
+    exigir(alvo.hp === alvo.vidaMax && jogo.projeteis.length === 0, "Onda tem alcance limitado " + slot);
+
+    [f, alvo] = reset(slot);
+    tecla(slot, "defende");
+    quadros(1);
+    exigir(f.receberGolpe({ dano: 10, knockback: 95, origemX: alvo.x }).bloqueado && f.hp === 99,
+      "Defesa comum permite chip " + slot);
+    tecla(slot, "defende", false);
+
+    [f, alvo] = reset(slot);
+    jogo.faseRound = "lutando";
+    jogo._encerrarRound(slot, false);
+    for (let i = 0; i < 65; i++) f.atualizar(1 / 60, false);
+    exigir(f.estado === ESTADOS.VICTORY && f.anim.terminou && f.perfil.fraseVitoria.includes("grave"),
+      "Pose e frase de vitoria " + slot);
+  }
+
+  jogo.escolha.p1 = jogo.escolha.p2 = indiceGreeg;
+  jogo._criarLutadores();
+  apertar("p1", "especial");
+  quadros(1);
+  exigir(jogo.p1.estado === ESTADOS.SHELL_GUARD && jogo.p2.estado === ESTADOS.IDLE && jogo.p2.recargaCasco === 0,
+    "Dois Greegs mantem timers independentes");
+  apertar("p2", "especial");
+  quadros(1);
+  exigir(jogo.p2.estado === ESTADOS.SHELL_GUARD && jogo.p1.recargaCasco < jogo.p2.recargaCasco,
+    "Segunda instancia ativa de forma independente");
+  jogo.modo = "1p";
+  const aleatorio = Math.random;
+  try {
+    Math.random = () => 0;
+    const [cpu, oponente] = reset("p2", 80);
+    oponente.iniciarSoco(false, false);
+    quadros(1);
+    exigir(cpu.estado === ESTADOS.SHELL_GUARD, "CPU responde com protecao");
+  } finally {
+    Math.random = aleatorio;
+  }
+  document.querySelector("#resultado").textContent = "PASSOU";
+}
+testar().catch((erro) => {
+  document.querySelector("#resultado").textContent = "FALHOU: " + erro.message;
+});
+</script>
+</html>

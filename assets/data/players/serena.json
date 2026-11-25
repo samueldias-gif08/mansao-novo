@@ -1,0 +1,449 @@
+{
+  "nome": "SERENA",
+  "retrato": "serena.png",
+  "ficha": {
+    "estilo": "Capoeira",
+    "lore": [
+      "A ginga dita o ritmo.",
+      "Quando o rival hesita, Serena já virou o jogo."
+    ],
+    "atributos": {
+      "forca": 3.75,
+      "velocidade": 4.75,
+      "defesa": 3.25,
+      "especial": 4
+    },
+    "dificuldade": 4
+  },
+  "combate": {
+    "vida": 85,
+    "somChute": "capoeira",
+    "velocidade": 1.16,
+    "impulsoPulo": 1.08,
+    "caminhada": 0.24,
+    "maxCombo": 4,
+    "hurtboxes": {
+      "normal": [
+        65,
+        178
+      ],
+      "baixa": [
+        95,
+        97
+      ]
+    },
+    "chutes": [
+      "kick",
+      "kick_armada",
+      "kick_martelo",
+      "kick_queixada"
+    ],
+    "avancoAgarrar": 135,
+    "projetil": {
+      "fireball": {
+        "nome": "Lâmina Esmeralda",
+        "forma": "meia-lua",
+        "cor": "#27e8a1",
+        "origem": [
+          96,
+          -126
+        ],
+        "vel": 520,
+        "raio": 29,
+        "dano": 9,
+        "tempoVida": 2.2
+      }
+    },
+    "especial": {
+      "nome": "Dança da Tempestade Esmeralda",
+      "avanco": [
+        13,
+        24,
+        590
+      ],
+      "impactos": [
+        {
+          "startup": 23,
+          "ativo": 4,
+          "recovery": 0,
+          "dano": 4,
+          "knockback": 30,
+          "alcance": [
+            12,
+            114
+          ],
+          "altura": [
+            -155,
+            -68
+          ],
+          "esmeralda": true
+        },
+        {
+          "startup": 34,
+          "ativo": 4,
+          "recovery": 0,
+          "dano": 5,
+          "knockback": 32,
+          "alcance": [
+            10,
+            125
+          ],
+          "altura": [
+            -154,
+            -63
+          ],
+          "esmeralda": true
+        },
+        {
+          "startup": 49,
+          "ativo": 5,
+          "recovery": 0,
+          "dano": 6,
+          "knockback": 35,
+          "alcance": [
+            12,
+            133
+          ],
+          "altura": [
+            -172,
+            -75
+          ],
+          "esmeralda": true
+        },
+        {
+          "startup": 65,
+          "ativo": 5,
+          "recovery": 0,
+          "dano": 7,
+          "knockback": 36,
+          "alcance": [
+            12,
+            142
+          ],
+          "altura": [
+            -147,
+            -63
+          ],
+          "esmeralda": true
+        },
+        {
+          "startup": 81,
+          "ativo": 6,
+          "recovery": 0,
+          "dano": 13,
+          "knockback": 265,
+          "alcance": [
+            8,
+            149
+          ],
+          "altura": [
+            -170,
+            -58
+          ],
+          "derruba": true,
+          "esmeralda": true
+        }
+      ]
+    }
+  },
+  "animacoes": {
+    "entry": {
+      "frames": 14,
+      "fps": 12,
+      "loop": false,
+      "poses": [15, 15, 15, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0]
+    },
+    "idle": {
+      "frames": 16,
+      "fps": 12,
+      "loop": true,
+      "poses": [0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1]
+    },
+    "walk_forward": {
+      "frames": 12,
+      "fps": 14,
+      "loop": true,
+      "poses": [0, 0, 0, 2, 2, 2, 1, 1, 1, 2, 2, 2]
+    },
+    "walk": {
+      "frames": 12,
+      "fps": 13,
+      "loop": true,
+      "poses": [1, 1, 1, 0, 0, 0, 2, 2, 2, 0, 0, 0]
+    },
+    "run": {
+      "frames": 12,
+      "fps": 19,
+      "loop": true,
+      "poses": [2, 2, 2, 2, 1, 1, 2, 2, 2, 2, 0, 0]
+    },
+    "jump": {
+      "frames": 7,
+      "fps": 18,
+      "loop": false,
+      "poses": [1, 3, 3, 3, 3, 3, 3]
+    },
+    "fall": {
+      "frames": 6,
+      "fps": 16,
+      "loop": false,
+      "poses": [9, 9, 3, 3, 1, 1]
+    },
+    "land": {
+      "frames": 4,
+      "fps": 24,
+      "loop": false,
+      "poses": [4, 4, 1, 0]
+    },
+    "crouch": {
+      "frames": 8,
+      "fps": 18,
+      "loop": false,
+      "poses": [1, 1, 14, 14, 4, 4, 4, 4]
+    },
+    "punch": {
+      "frames": 6,
+      "fps": 24,
+      "loop": false,
+      "poses": [1, 5, 5, 5, 1, 0]
+    },
+    "punch_step": {
+      "frames": 7,
+      "fps": 24,
+      "loop": false,
+      "poses": [2, 2, 5, 5, 5, 1, 0]
+    },
+    "soco_baixo": {
+      "frames": 6,
+      "fps": 24,
+      "loop": false,
+      "poses": [4, 5, 5, 5, 14, 4]
+    },
+    "kick": {
+      "frames": 9,
+      "fps": 24,
+      "loop": false,
+      "poses": [1, 1, 4, 4, 6, 6, 6, 14, 0]
+    },
+    "kick_armada": {
+      "frames": 9,
+      "fps": 24,
+      "loop": false,
+      "poses": [0, 0, 2, 7, 7, 7, 8, 1, 0]
+    },
+    "kick_martelo": {
+      "frames": 8,
+      "fps": 24,
+      "loop": false,
+      "poses": [1, 2, 8, 8, 8, 8, 1, 0]
+    },
+    "kick_queixada": {
+      "frames": 9,
+      "fps": 24,
+      "loop": false,
+      "poses": [0, 0, 8, 8, 7, 7, 7, 1, 0]
+    },
+    "kick_mid": {
+      "frames": 8,
+      "fps": 24,
+      "loop": false,
+      "poses": [4, 4, 4, 10, 10, 10, 14, 0]
+    },
+    "kick_jump": {
+      "frames": 7,
+      "fps": 24,
+      "loop": false,
+      "poses": [3, 3, 9, 9, 9, 9, 3]
+    },
+    "fireball": {
+      "frames": 12,
+      "fps": 24,
+      "loop": false,
+      "poses": [1, 1, 4, 4, 7, 7, 6, 6, 6, 1, 1, 0]
+    },
+    "grab": {
+      "frames": 12,
+      "fps": 24,
+      "loop": false,
+      "poses": [2, 2, 2, 4, 10, 10, 10, 10, 14, 14, 1, 0]
+    },
+    "throw_tech": {
+      "frames": 5,
+      "fps": 24,
+      "loop": false,
+      "poses": [12, 12, 11, 11, 0]
+    },
+    "special": {
+      "frames": 40,
+      "fps": 24,
+      "loop": false,
+      "poses": [0, 0, 0, 1, 1, 1, 2, 2, 2, 7, 7, 7, 2, 2, 8, 8, 8, 16, 16, 16, 17, 17, 17, 4, 4, 6, 6, 6, 6, 16, 16, 17, 17, 17, 17, 14, 14, 1, 1, 0]
+    },
+    "block": {
+      "frames": 5,
+      "fps": 20,
+      "loop": false,
+      "poses": [1, 11, 11, 11, 11]
+    },
+    "block_low": {
+      "frames": 5,
+      "fps": 20,
+      "loop": false,
+      "poses": [1, 14, 4, 4, 4]
+    },
+    "hit": {
+      "frames": 5,
+      "fps": 20,
+      "loop": false,
+      "poses": [12, 12, 12, 12, 1]
+    },
+    "knockdown": {
+      "frames": 8,
+      "fps": 20,
+      "loop": false,
+      "poses": [12, 12, 13, 13, 13, 13, 13, 13]
+    },
+    "getup": {
+      "frames": 9,
+      "fps": 22,
+      "loop": false,
+      "poses": [13, 13, 14, 14, 14, 14, 4, 1, 0]
+    },
+    "taunt": {
+      "frames": 17,
+      "fps": 18,
+      "loop": false,
+      "poses": [0, 0, 1, 1, 15, 15, 15, 15, 15, 15, 15, 15, 15, 1, 1, 0, 0]
+    },
+    "victory": {
+      "frames": 20,
+      "fps": 16,
+      "loop": false,
+      "poses": [0, 0, 1, 1, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15]
+    },
+    "defeat": {
+      "frames": 12,
+      "fps": 16,
+      "loop": false,
+      "poses": [12, 12, 12, 12, 14, 14, 14, 14, 14, 14, 14, 14]
+    },
+    "ko": {
+      "frames": 10,
+      "fps": 20,
+      "loop": false,
+      "poses": [12, 12, 13, 13, 13, 13, 13, 13, 13, 13]
+    }
+  },
+  "golpes": {
+    "punch": {
+      "dano": 5,
+      "knockback": 70
+    },
+    "punch_step": {
+      "dano": 6,
+      "knockback": 80
+    },
+    "soco_baixo": {
+      "dano": 4,
+      "knockback": 75
+    },
+    "kick": {
+      "startup": 10,
+      "ativo": 5,
+      "recovery": 7,
+      "dano": 9,
+      "knockback": 66,
+      "alcance": [
+        12,
+        137
+      ],
+      "altura": [
+        -153,
+        -90
+      ],
+      "cancelavel": true,
+      "tipo_altura": "medio"
+    },
+    "kick_armada": {
+      "startup": 8,
+      "ativo": 5,
+      "recovery": 7,
+      "dano": 8,
+      "knockback": 66,
+      "alcance": [
+        12,
+        130
+      ],
+      "altura": [
+        -151,
+        -87
+      ],
+      "cancelavel": true,
+      "tipo_altura": "medio"
+    },
+    "kick_martelo": {
+      "startup": 7,
+      "ativo": 5,
+      "recovery": 7,
+      "dano": 8,
+      "knockback": 66,
+      "alcance": [
+        12,
+        135
+      ],
+      "altura": [
+        -143,
+        -85
+      ],
+      "cancelavel": true,
+      "tipo_altura": "medio"
+    },
+    "kick_queixada": {
+      "startup": 10,
+      "ativo": 5,
+      "recovery": 7,
+      "dano": 10,
+      "knockback": 66,
+      "alcance": [
+        12,
+        143
+      ],
+      "altura": [
+        -160,
+        -85
+      ],
+      "cancelavel": false,
+      "tipo_altura": "medio",
+      "derruba": true
+    },
+    "kick_mid": {
+      "startup": 9,
+      "ativo": 5,
+      "dano": 8
+    },
+    "kick_jump": {
+      "startup": 7,
+      "ativo": 5,
+      "dano": 10
+    },
+    "fireball": {
+      "startup": 15,
+      "ativo": 5
+    },
+    "agarra": {
+      "nome": "Rasteira Selvagem",
+      "alvoNoChao": true,
+      "startup": 11,
+      "ativo": 5,
+      "alcance": [
+        8,
+        81
+      ],
+      "altura": [
+        -63,
+        -1
+      ],
+      "dano": 12
+    }
+  }
+}

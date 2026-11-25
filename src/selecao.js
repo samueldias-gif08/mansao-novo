@@ -16,6 +16,7 @@ function colideAABB(a, b) {
 const TELAS = {
   APRESENTA: "apresenta", // intro do estúdio — antes do menu inicial
   START: "start",
+  HISTORIA: "historia",
   MODO: "modo",
   DIFICULDADE: "dificuldade",
   SELECT: "select", // seleção de PERSONAGEM
@@ -169,6 +170,14 @@ const CONFIGS = [
       jogo.crt = v;
     },
   },
-  // ── Adicione novas configurações abaixo ──────────────────────────────────
+  {
+    id: "instrucoesCombate",
+    label: "Exibir instruções de combate",
+    tipo: "toggle",
+    get: () => CONFIG.video.instrucoesCombate,
+    set: (v) => {
+      CONFIG.video.instrucoesCombate = v;
+    },
+  },
 ];
 

@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<title>Teste da capa e dos menus</title>
+<style>iframe { display: block; border: 0; width: 960px; height: 540px; }</style>
+<pre id="resultado">Executando...</pre>
+<script>
+  function exigir(condicao, mensagem) {
+    if (!condicao) throw new Error(mensagem);
+  }
+
+  async function testar() {
+    const fonte = (await (await fetch("../index.html")).text())
+      .replace("<head>", '<head><base href="../">')
+      .replace('<script src="src/main.js"><\/script>', "");
+    const iframe = document.createElement("iframe");
+    iframe.allowFullscreen = true;
+    const carregou = new Promise((resolve) => iframe.addEventListener("load", resolve, { once: true }));
+    iframe.srcdoc = fonte;
+    document.body.append(iframe);
+    await carregou;
+    const janela = iframe.contentWindow;
+    const criar = janela.Function(`
+      return (async () => {
+        const recursos = new Recursos({ players: {} });
+        await recursos.precarregar();
+        const sons = [];
+        const jogo = new Jogo(document.getElementById("tela"), recursos, null,
+          { tocar() {} }, { tocar: (som) => sons.push(som) });
+        jogo.audio.garantir = () => {};
+        jogo.audio.navegacaoMetalMenu = () => sons.push("metálico");
+        jogo.crt = false;
+        return { jogo, recursos, sons, TELAS, START_TIMING, OPCOES_MENU };
+      })();
+    `);
+    const { jogo, recursos, sons, TELAS, START_TIMING, OPCOES_MENU } = await criar();
+    if (new URLSearchParams(location.search).has("capa")) {
+      exigir(recursos.capaMenu?.naturalWidth === 32 && recursos.capaMenu.naturalHeight === 18,
+        "Pré-carregamento da capa de teste");
+    }
+    const tecla = (codigo, dt = 1 / 60) => {
+      if (codigo) janela.dispatchEvent(new janela.KeyboardEvent("keydown", { code: codigo }));
+      jogo._atualizar(dt);
+      if (codigo) janela.dispatchEvent(new janela.KeyboardEvent("keyup", { code: codigo }));
+      jogo.entrada.bordas.length = 0;
+      jogo.entrada.confirmar = jogo.entrada.voltar = false;
+    };
+    const textos = [];
+    const fillText = jogo.ctx.fillText.bind(jogo.ctx);
+    jogo.ctx.fillText = (texto, ...args) => {
+      textos.push(texto);
+      fillText(texto, ...args);
+    };
+    jogo.tela = TELAS.START;
+    jogo.start.fase = "titulo";
+    jogo._desenhar();
+    const capaVisivel = () => janela.document.querySelector(".capa-menu-arte:not([hidden])");
+    const fundo = capaVisivel();
+    exigir(fundo === recursos.capaMenu, "Fundo só usa a capa carregada");
+    exigir(!jogo.acoesTitulo.hidden && !textos.includes("MANSÃO FIGHT"),
+      "Título vem da capa e o menu principal aparece");
+    exigir(jogo.ctx.getImageData(870, 70, 1, 1).data[3] < 90, "Capa permanece livre fora da coluna");
+    tecla(undefined, START_TIMING.ociosoAttract + 0.1);
+    exigir(jogo.start.fase === "attract", "Apresentação automática");
+    jogo._desenhar();
+    exigir(capaVisivel() === fundo, "Apresentação mantém a capa");
+    tecla("KeyA");
+    exigir(jogo.start.fase === "titulo", "Tecla retorna ao convite");
+    tecla("Enter");
+    exigir(jogo.start.fase === "saindo", "Confirmação do título");
+    tecla(undefined, START_TIMING.saida + 0.1);
+    exigir(jogo.tela === TELAS.HISTORIA, "Título abre história");
+    tecla("Escape");
+    exigir(jogo.tela === TELAS.MODO && jogo.menuIndex === 0, "Pular abre modos");
+    jogo.modoRevealT0 -= 700;
+    textos.length = 0;
+    jogo._desenhar();
+    exigir(capaVisivel() === fundo && OPCOES_MENU.every(([nome]) => textos.includes(nome)),
+      "Mesma capa e todas as opções");
+    tecla("ArrowUp");
+    exigir(jogo.menuIndex === 2, "Seta acima contorna a lista");
+    tecla("KeyS");
+    exigir(jogo.menuIndex === 0 && sons.includes("metálico"), "W/S e áudio de navegação");
+    tecla("Enter");
+    exigir(jogo.tela === TELAS.DIFICULDADE && jogo.dificuldadeIndex === 1 && jogo.menuCorteT0 != null,
+      "1 Jogador abre dificuldade e corte");
+    tecla("ArrowUp");
+    tecla("Enter");
+    exigir(jogo.tela === TELAS.SELECT && jogo.modo === "1p" && jogo.dificuldade === "facil",
+      "Dificuldade preservada");
+    tecla("Escape");
+    exigir(jogo.tela === TELAS.MODO && jogo.menuIndex === 0, "Retorno ao menu no modo solo");
+    tecla("ArrowDown");
+    tecla("Enter");
+    exigir(jogo.tela === TELAS.SELECT && jogo.modo === "2p", "2 Jogadores abre seleção");
+    tecla("Escape");
+    exigir(jogo.tela === TELAS.MODO, "Retorno da seleção");
+    jogo._entrarModo(2);
+    tecla("Enter");
+    exigir(jogo.tela === TELAS.CONFIG, "Acesso às configurações");
+    tecla("Escape");
+    exigir(jogo.tela === TELAS.MODO && jogo.menuIndex === 2, "Retorno das configurações");
+    tecla("Escape");
+    exigir(jogo.tela === TELAS.START && jogo.start.fase === "intro", "ESC retorna à abertura");
+    const tempos = [];
+    for (const [w,h] of [[640,480],[1920,1080],[3840,2160]]) {
+      iframe.style.width = w + "px";
+      iframe.style.height = h + "px";
+      jogo._entrarModo(1);
+      jogo.modoRevealT0 -= 700;
+      jogo._desenhar();
+      const area = jogo.canvas.getBoundingClientRect();
+      exigir(area.width <= w && area.height <= h && Math.abs(area.width / area.height - 16 / 9) < 0.02,
+        "Canvas responsivo " + w);
+      if (fundo) {
+        exigir(janela.getComputedStyle(fundo).objectFit === "cover" &&
+          fundo.getBoundingClientRect().width === area.width, "Capa mantém proporção " + w);
+      }
+      const inicio = performance.now();
+      for (let i = 0; i < 10; i++) jogo._desenhar();
+      jogo.ctx.getImageData(0, 0, 1, 1);
+      tempos.push(Math.round((performance.now() - inicio) / 10 * 10) / 10);
+    }
+    iframe.style.width = "1280px";
+    iframe.style.height = "720px";
+    window.validarTelaCheia = async () => {
+      await iframe.requestFullscreen();
+      exigir(document.fullscreenElement === iframe, "Tela cheia ativa");
+      jogo._desenhar();
+      exigir(capaVisivel() === fundo, "Capa permanece em tela cheia");
+      tecla("ArrowUp");
+      exigir(jogo.menuIndex === 0, "Navegação em tela cheia");
+      await document.exitFullscreen();
+      jogo._desenhar();
+      return true;
+    };
+    resultado.textContent = "PASSOU " + JSON.stringify(tempos);
+  }
+  testar().catch((erro) => { resultado.textContent = "FALHOU: " + erro.message; });
+</script>
+</html>

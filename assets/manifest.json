@@ -3,9 +3,28 @@
   "frameSize": [256, 256],
   "mapa": "arena1.png",
   "mapas": "data/mapas.json",
+  "artesSelecao": {
+    "p1": { "principal": "p1.webp", "retrato": "p1-retrato.webp" },
+    "p2": { "principal": "p2.webp", "retrato": "p2-retrato.webp" },
+    "p3": { "principal": "p3.webp", "retrato": "p3-retrato.webp" },
+    "serena": { "principal": "serena.webp", "retrato": "serena-retrato.webp" },
+    "android67": { "principal": "android67.webp", "retrato": "android67-retrato.webp" },
+    "belyx": { "principal": "belyx.webp", "retrato": "belyx-retrato.webp" },
+    "alessander": { "principal": "alessander.webp", "retrato": "alessander-retrato.webp" },
+    "carter": { "principal": "carter.webp", "retrato": "carter-retrato.webp" },
+    "greeg": { "principal": "greeg.webp", "retrato": "greeg-retrato.webp" },
+    "morgana": { "principal": "morgana.webp", "retrato": "morgana-retrato.webp" }
+  },
   "players": {
     "p1": "data/players/p1.json",
     "p2": "data/players/p2.json",
-    "p3": "data/players/p3.json"
+    "p3": "data/players/p3.json",
+    "serena": "data/players/serena.json",
+    "android67": "data/players/android67.json",
+    "belyx": "data/players/belyx.json",
+    "alessander": "data/players/alessander.json",
+    "carter": "data/players/carter.json",
+    "greeg": "data/players/greeg.json",
+    "morgana": "data/players/morgana.json"
   }
 }

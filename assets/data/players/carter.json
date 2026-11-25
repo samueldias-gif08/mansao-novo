@@ -1,0 +1,201 @@
+{
+  "nome": "TENENTE CARTER",
+  "retrato": "carter.png",
+  "ficha": {
+    "estilo": "Indefinido",
+    "lore": [
+      "Especialidade: combate aéreo.",
+      "Patrulha a arena com agilidade e alcance."
+    ],
+    "atributos": {
+      "forca": 3.75,
+      "velocidade": 4.75,
+      "defesa": 3.5,
+      "especial": 4.4
+    },
+    "dificuldade": 4
+  },
+  "combate": {
+    "vida": 80,
+    "velocidade": 1.17,
+    "caminhada": 0.18,
+    "maxCombo": 3,
+    "chuteAereoGiro": "talon_spin",
+    "socos": [
+      "punch",
+      "wing_cross",
+      "punch_step"
+    ],
+    "avancoAgarrar": 265,
+    "hurtboxes": {
+      "normal": [87, 151],
+      "baixa": [90, 135]
+    },
+    "vooPermanente": {
+      "altura": 35,
+      "minima": 13,
+      "maxima": 85,
+      "rotuloGolpe": "Corte com o Bico"
+    },
+    "fraseVitoria": "Missão cumprida!",
+    "projetil": {
+      "fireball": {
+        "nome": "Pena de Impacto",
+        "forma": "pena",
+        "dano": 8,
+        "vel": 535,
+        "cor": "#ffbc56",
+        "raio": 17,
+        "origem": [69, -90],
+        "tempoVida": 2
+      }
+    },
+    "especial": {
+      "nome": "Patrulha Bumerangue",
+      "rotulo": "Ataque Bumerangue",
+      "efeito": "bumerangue",
+      "distancia": 415,
+      "duracao": 1.05,
+      "recarga": 3.5,
+      "impactos": [
+        {
+          "startup": 2,
+          "ativo": 26,
+          "recovery": 0,
+          "dano": 9,
+          "knockback": 22,
+          "alcance": [0, 112],
+          "altura": [-145, -27],
+          "corImpacto": "#ffae42"
+        },
+        {
+          "startup": 34,
+          "ativo": 27,
+          "recovery": 0,
+          "dano": 13,
+          "knockback": 185,
+          "alcance": [0, 114],
+          "altura": [-141, -24],
+          "corImpacto": "#fff6d2",
+          "derruba": true
+        }
+      ]
+    }
+  },
+  "animacoes": {
+    "entry": { "frames": 9, "fps": 12, "loop": false, "poses": [2, 3, 2, 1, 16, 16, 0, 1, 0] },
+    "idle": { "frames": 4, "fps": 13, "loop": true, "poses": [0, 1, 1, 0] },
+    "walk_forward": { "frames": 4, "fps": 15, "loop": true, "poses": [2, 0, 2, 1] },
+    "walk": { "frames": 4, "fps": 15, "loop": true, "poses": [3, 0, 3, 1] },
+    "run": { "frames": 4, "fps": 21, "loop": true, "poses": [2, 1, 2, 0] },
+    "jump": { "frames": 4, "fps": 16, "loop": true, "poses": [4, 0, 4, 1] },
+    "crouch": { "frames": 4, "fps": 15, "loop": true, "poses": [5, 1, 5, 0] },
+    "punch": { "frames": 6, "fps": 25, "loop": false, "poses": [0, 1, 6, 6, 1, 0] },
+    "punch_step": { "frames": 6, "fps": 25, "loop": false, "poses": [2, 0, 7, 7, 2, 0] },
+    "wing_cross": { "frames": 6, "fps": 25, "loop": false, "poses": [1, 0, 7, 7, 1, 0] },
+    "kick": { "frames": 6, "fps": 23, "loop": false, "poses": [0, 5, 8, 8, 1, 0] },
+    "kick_jump": { "frames": 6, "fps": 24, "loop": false, "poses": [1, 8, 8, 8, 0, 1] },
+    "talon_spin": { "frames": 6, "fps": 22, "loop": false, "poses": [0, 8, 9, 9, 8, 1] },
+    "fireball": { "frames": 7, "fps": 24, "loop": false, "poses": [0, 1, 10, 10, 10, 1, 0] },
+    "grab": { "frames": 11, "fps": 23, "loop": false, "poses": [2, 6, 11, 11, 11, 11, 13, 13, 7, 1, 0] },
+    "throw_tech": { "frames": 5, "fps": 21, "loop": false, "poses": [11, 14, 18, 1, 0] },
+    "patrulha_ida": { "frames": 4, "fps": 23, "loop": true, "poses": [12, 2, 12, 2] },
+    "patrulha_curva": { "frames": 4, "fps": 19, "loop": true, "poses": [13, 9, 13, 0] },
+    "patrulha_volta": { "frames": 4, "fps": 23, "loop": true, "poses": [2, 12, 2, 12] },
+    "special": { "frames": 4, "fps": 19, "loop": true, "poses": [12, 13, 2, 1] },
+    "beak": { "frames": 8, "fps": 24, "loop": false, "poses": [3, 0, 15, 15, 15, 2, 1, 0] },
+    "block": { "frames": 4, "fps": 18, "loop": true, "poses": [14, 14, 1, 14] },
+    "block_low": { "frames": 3, "fps": 18, "loop": true, "poses": [14, 5, 14] },
+    "hit": { "frames": 5, "fps": 20, "loop": false, "poses": [18, 18, 5, 1, 0] },
+    "knockdown": { "frames": 6, "fps": 18, "loop": false, "poses": [18, 19, 19, 19, 18, 5] },
+    "getup": { "frames": 5, "fps": 20, "loop": false, "poses": [19, 18, 4, 1, 0] },
+    "ko": { "frames": 5, "fps": 15, "loop": false, "poses": [18, 19, 19, 19, 19] },
+    "victory": { "frames": 12, "fps": 15, "loop": false, "poses": [20, 20, 20, 21, 21, 22, 22, 22, 17, 17, 17, 17] },
+    "defeat": { "frames": 5, "fps": 15, "loop": false, "poses": [18, 19, 5, 19, 19] }
+  },
+  "golpes": {
+    "punch": {
+      "startup": 4,
+      "ativo": 4,
+      "recovery": 8,
+      "dano": 5,
+      "knockback": 46,
+      "alcance": [11, 116],
+      "altura": [-127, -28],
+      "tipo_altura": "medio",
+      "cancelavel": true
+    },
+    "punch_step": {
+      "startup": 5,
+      "ativo": 4,
+      "recovery": 8,
+      "dano": 6,
+      "knockback": 66,
+      "alcance": [9, 123],
+      "altura": [-130, -35],
+      "tipo_altura": "medio",
+      "cancelavel": true
+    },
+    "wing_cross": {
+      "startup": 5,
+      "ativo": 4,
+      "recovery": 8,
+      "dano": 6,
+      "knockback": 55,
+      "alcance": [8, 115],
+      "altura": [-123, -33],
+      "cancelavel": true
+    },
+    "kick": {
+      "startup": 7,
+      "ativo": 5,
+      "recovery": 12,
+      "dano": 9,
+      "knockback": 146,
+      "alcance": [11, 127],
+      "altura": [-100, -6]
+    },
+    "kick_jump": {
+      "startup": 6,
+      "ativo": 5,
+      "recovery": 10,
+      "dano": 9,
+      "knockback": 143,
+      "alcance": [12, 128],
+      "altura": [-104, -4],
+      "cancelavel": true
+    },
+    "talon_spin": {
+      "startup": 7,
+      "ativo": 5,
+      "recovery": 12,
+      "dano": 10,
+      "knockback": 165,
+      "alcance": [11, 125],
+      "altura": [-125, -14]
+    },
+    "agarra": {
+      "startup": 8,
+      "ativo": 6,
+      "recovery": 11,
+      "dano": 12,
+      "knockback": 218,
+      "alcance": [5, 96],
+      "altura": [-123, -19],
+      "captura": 0.19
+    },
+    "fireball": {
+      "startup": 7,
+      "ativo": 5
+    },
+    "beak": {
+      "startup": 6,
+      "ativo": 6,
+      "recovery": 11,
+      "dano": 11,
+      "knockback": 122,
+      "alcance": [23, 144],
+      "altura": [-128, -57]
+    }
+  }
+}

@@ -101,6 +101,7 @@ class CatalogoMapas {
     return {
       id: meta.id || baseId,
       nome: String(meta.nome || `ARENA ${ordem}`).toUpperCase(),
+      escalaFundo: meta.escalaFundo,
       arquivo,
       caminho, // caminho da imagem COMPLETA
       caminhos: [caminho], // camadas extras (parallax) caberiam aqui no futuro

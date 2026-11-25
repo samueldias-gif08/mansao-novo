@@ -1,7 +1,6 @@
 /* ===========================================================================
    Mansão Fight — estilos da página
-   Todo o jogo é renderizado no <canvas>; o CSS só centraliza e estiliza a
-   moldura, além de uma caixa de aviso usada quando o manifest não carrega.
+   Arena em canvas, moldura e painéis de instruções de combate.
    =========================================================================== */
 
 * {
@@ -26,25 +25,225 @@ body {
   justify-content: center;
 }
 
+#palco {
+  --margem: clamp(5px, 1.3vw, 20px);
+  --linha-combate: clamp(14px, 3.55dvh, 27px);
+  display: grid;
+  place-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+#palco:fullscreen {
+  background: #0a0a0f;
+}
+
 #moldura {
   position: relative;
-  /* Mantém a proporção 16:9 do canvas, ocupando o máximo disponível. */
-  width: min(96vw, 170.6vh);
-  aspect-ratio: 16 / 9;
-  border: 3px solid #2b2b3a;
-  box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+  width: min(96vw, 170.6dvh);
+  container-type: inline-size;
+  box-shadow: 0 0 0 3px #2b2b3a, 0 0 40px rgba(0, 0, 0, 0.8);
   background: #000;
 }
 
 #tela {
   width: 100%;
-  height: 100%;
+  height: auto;
   display: block;
   /* Pixels nítidos ao escalar (estética retrô). */
   image-rendering: pixelated;
-  /* Jogo 100% por teclado/gamepad: esconde o cursor do sistema sobre o canvas
-     (a seleção tem cursor próprio desenhado — chama/faixa nos menus). */
-  cursor: none;
+}
+
+#tela.selecao-cinematica {
+  image-rendering: auto;
+}
+
+#tela.menu-capa {
+  position: relative;
+  z-index: 1;
+  image-rendering: auto;
+}
+
+#moldura:has(> .menu-capa) {
+  background-color: #09090e;
+}
+
+.capa-menu-arte {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  pointer-events: none;
+}
+
+#acoes-titulo,
+#pular-historia {
+  position: absolute;
+  z-index: 2;
+}
+
+#acoes-titulo {
+  bottom: 13.5%;
+  left: 3.1%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(4px, 0.7vw, 12px);
+}
+
+#acoes-titulo[hidden],
+#pular-historia[hidden] {
+  display: none;
+}
+
+#pular-historia {
+  padding: clamp(4px, 0.8vw, 9px) clamp(7px, 1.2vw, 15px);
+  border: 1px solid #bd8178;
+  background: #120a14e8;
+  color: #fff2e6;
+  cursor: pointer;
+}
+
+#assistir-historia {
+  border: 0;
+  background: transparent;
+  color: #fff2e6;
+  font: italic 900 3.645833cqw Impact, "Bahnschrift Condensed", sans-serif;
+  text-shadow: 0 2px 4px #10070d;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+#assistir-historia:hover,
+#assistir-historia:focus-visible {
+  color: #ffb3a4;
+}
+
+#assistir-historia:focus-visible {
+  outline: none;
+  text-decoration: underline;
+}
+
+#pular-historia:hover {
+  background: #6b1830;
+}
+
+#pular-historia:focus-visible {
+  outline: 2px solid #ffbd9c;
+  outline-offset: 3px;
+}
+
+#pular-historia {
+  right: 2.6%;
+  bottom: 5.8%;
+  font: 600 clamp(9px, 1.2vw, 14px) system-ui, sans-serif;
+}
+
+#palco.com-instrucoes {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-areas: "arena arena" "p1 p2";
+  gap: var(--margem);
+  padding: var(--margem);
+}
+
+.com-instrucoes #moldura {
+  grid-area: arena;
+  justify-self: center;
+  width: min(100%, calc((100dvh - 10 * var(--linha-combate) - 41px - 3 * var(--margem)) * 16 / 9));
+}
+
+.painel-combate {
+  --acento: #75cbff;
+  grid-area: p1;
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--acento) 45%, #182033);
+  border-radius: 8px 2px;
+  padding: 5px clamp(4px, 0.9vw, 13px) 7px;
+  background: linear-gradient(155deg, rgba(24, 21, 43, 0.92), rgba(15, 13, 25, 0.82));
+  box-shadow: inset 0 2px 0 var(--acento), 0 0 14px color-mix(in srgb, var(--acento) 12%, transparent);
+  color: #e0dbea;
+  user-select: none;
+}
+
+.painel-combate--p2 {
+  --acento: #ff7b89;
+  grid-area: p2;
+}
+
+.painel-combate h2 {
+  display: grid;
+  place-items: center;
+  height: 27px;
+  color: var(--acento);
+  font-size: clamp(11px, 1.45vw, 17px);
+  letter-spacing: 0.14em;
+}
+
+.painel-combate dl > div,
+.painel-combate dt,
+.painel-combate dd {
+  display: flex;
+  align-items: center;
+}
+
+.painel-combate dl > div {
+  justify-content: space-between;
+  gap: 3px;
+  height: var(--linha-combate);
+  border-top: 1px solid rgba(218, 210, 236, 0.09);
+  font-size: clamp(10px, 1.35vw, 14px);
+}
+
+.painel-combate dt {
+  gap: clamp(3px, 0.55vw, 8px);
+}
+
+.painel-combate dd {
+  gap: 3px;
+}
+
+.icone-combate {
+  width: 1.15em;
+  text-align: center;
+  color: var(--acento);
+  font-family: "Segoe UI Symbol", sans-serif;
+}
+
+.painel-combate kbd {
+  display: grid;
+  place-items: center;
+  min-width: clamp(15px, 2vw, 24px);
+  height: min(22px, calc(var(--linha-combate) - 2px));
+  padding: 0 2px;
+  border: 1px solid #625975;
+  border-radius: 4px;
+  background: linear-gradient(#302942, #1c182a);
+  box-shadow: inset 0 -2px #0e0b17;
+  color: #f4efff;
+  font-family: "Segoe UI", sans-serif;
+  font-weight: 700;
+  transition: background-color 100ms, border-color 100ms, box-shadow 100ms;
+}
+
+.painel-combate kbd.pressionada {
+  border-color: var(--acento);
+  background: #4a3c59;
+  box-shadow: inset 0 -1px var(--acento), 0 0 8px color-mix(in srgb, var(--acento) 50%, transparent);
+  color: #fff;
+}
+
+@media (min-width: 700px) and (min-aspect-ratio: 6/5) {
+  #palco.com-instrucoes {
+    --largura-painel: clamp(154px, 15vw, 232px);
+    grid-template-columns: var(--largura-painel) minmax(0, 1fr) var(--largura-painel);
+    grid-template-areas: "p1 arena p2";
+  }
+
+  .com-instrucoes #moldura {
+    width: min(100%, 170.6dvh);
+  }
 }
 
 /* Caixa de aviso (ex.: manifest bloqueado por CORS no file://). */

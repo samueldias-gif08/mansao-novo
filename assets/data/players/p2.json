@@ -1,5 +1,7 @@
 {
   "nome": "Vítor De Sordi",
+  "pastaSprites": "p2-ilustrado",
+  "spriteLuta": { "escala": 1.2378, "ajusteY": 6.90 },
   "retrato": "vitor_v2.png",
   "ficha": {
     "cidade": "SANTANA DO ITARARÉ — PR",

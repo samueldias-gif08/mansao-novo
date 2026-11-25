@@ -1,0 +1,209 @@
+{
+  "nome": "ALESSANDER",
+  "retrato": "alessander.png",
+  "ficha": {
+    "estilo": "MMA",
+    "lore": [
+      "Encurta a distância com golpes e clinches.",
+      "Controla o espaço com vento e ondas sônicas."
+    ],
+    "atributos": {
+      "forca": 4.5,
+      "velocidade": 4.2,
+      "defesa": 4.25,
+      "especial": 4.4
+    },
+    "dificuldade": 4
+  },
+  "combate": {
+    "vida": 92,
+    "velocidade": 1.06,
+    "caminhada": 0.23,
+    "maxCombo": 4,
+    "socos": [
+      "punch",
+      "punch_step",
+      "punch_elbow",
+      "punch_hook"
+    ],
+    "chutes": [
+      "kick"
+    ],
+    "chuteAvanco": "kick_side",
+    "chuteCombo": "kick_knee",
+    "avancoAgarrar": 95,
+    "hurtboxes": {
+      "normal": [72, 191],
+      "baixa": [87, 120]
+    },
+    "ondaSonica": {
+      "rotulo": "Onda sônica",
+      "recarga": 1.6
+    },
+    "projetil": {
+      "fireball": {
+        "nome": "Pulso de Impacto",
+        "dano": 9,
+        "vel": 515,
+        "cor": "#a788ff",
+        "raio": 17,
+        "origem": [82, -145],
+        "tempoVida": 2
+      },
+      "sonic": {
+        "nome": "Rugido Sônico",
+        "dano": 12,
+        "vel": 375,
+        "cor": "#bc99ff",
+        "raio": 29,
+        "origem": [66, -120],
+        "tempoVida": 0.72,
+        "forma": "onda-sonica"
+      }
+    },
+    "especial": {
+      "nome": "Fúria Tornado",
+      "rotulo": "Tornado",
+      "efeito": "tornado",
+      "avanco": [6, 25, 480],
+      "impactos": [
+        {
+          "startup": 9,
+          "ativo": 7,
+          "recovery": 0,
+          "dano": 7,
+          "knockback": 24,
+          "alcance": [4, 115],
+          "altura": [-168, -75],
+          "cancelavel": false,
+          "tipo_altura": "medio"
+        },
+        {
+          "startup": 23,
+          "ativo": 7,
+          "recovery": 0,
+          "dano": 17,
+          "knockback": 235,
+          "alcance": [4, 137],
+          "altura": [-181, -68],
+          "cancelavel": false,
+          "tipo_altura": "medio",
+          "derruba": true
+        }
+      ]
+    }
+  },
+  "animacoes": {
+    "entry": { "frames": 6, "fps": 12, "loop": false, "poses": [15, 15, 1, 13, 0, 0] },
+    "idle": { "frames": 8, "fps": 11, "loop": true, "poses": [0, 0, 0, 0, 13, 13, 0, 0] },
+    "walk_forward": { "frames": 6, "fps": 14, "loop": true, "poses": [0, 1, 1, 0, 2, 2] },
+    "walk": { "frames": 6, "fps": 13, "loop": true, "poses": [2, 2, 0, 1, 1, 0] },
+    "run": { "frames": 6, "fps": 18, "loop": true, "poses": [1, 3, 3, 1, 2, 3] },
+    "jump": { "frames": 5, "fps": 17, "loop": false, "poses": [6, 4, 4, 4, 4] },
+    "fall": { "frames": 5, "fps": 15, "loop": false, "poses": [4, 5, 5, 5, 5] },
+    "land": { "frames": 4, "fps": 24, "loop": false, "poses": [6, 6, 13, 0] },
+    "crouch": { "frames": 4, "fps": 20, "loop": false, "poses": [0, 6, 6, 6] },
+    "punch": { "frames": 6, "fps": 26, "loop": false, "poses": [0, 0, 7, 7, 13, 0] },
+    "punch_step": { "frames": 7, "fps": 24, "loop": false, "poses": [1, 1, 7, 7, 7, 13, 0] },
+    "punch_elbow": { "frames": 7, "fps": 24, "loop": false, "poses": [0, 13, 8, 8, 8, 13, 0] },
+    "punch_hook": { "frames": 7, "fps": 25, "loop": false, "poses": [13, 2, 8, 8, 8, 13, 0] },
+    "soco_baixo": { "frames": 6, "fps": 24, "loop": false, "poses": [6, 6, 8, 8, 6, 0] },
+    "kick": { "frames": 8, "fps": 24, "loop": false, "poses": [0, 2, 9, 10, 10, 10, 9, 0] },
+    "kick_side": { "frames": 9, "fps": 24, "loop": false, "poses": [1, 3, 9, 10, 10, 10, 9, 13, 0] },
+    "kick_knee": { "frames": 8, "fps": 25, "loop": false, "poses": [13, 12, 9, 9, 9, 12, 13, 0] },
+    "kick_mid": { "frames": 8, "fps": 24, "loop": false, "poses": [6, 6, 9, 10, 10, 6, 6, 0] },
+    "kick_jump": { "frames": 7, "fps": 24, "loop": false, "poses": [4, 4, 10, 10, 10, 5, 5] },
+    "fireball": { "frames": 8, "fps": 24, "loop": false, "poses": [0, 13, 11, 11, 11, 11, 13, 0] },
+    "sonic": { "frames": 10, "fps": 24, "loop": false, "poses": [13, 13, 4, 4, 19, 19, 19, 19, 13, 0] },
+    "grab": { "frames": 10, "fps": 24, "loop": false, "poses": [0, 1, 12, 12, 9, 9, 9, 12, 13, 0] },
+    "throw_tech": { "frames": 6, "fps": 22, "loop": false, "poses": [12, 14, 14, 2, 13, 0] },
+    "special": { "frames": 16, "fps": 24, "loop": false, "poses": [0, 1, 9, 15, 10, 15, 9, 15, 10, 15, 10, 9, 5, 13, 0, 0] },
+    "block": { "frames": 4, "fps": 22, "loop": false, "poses": [0, 13, 13, 13] },
+    "block_low": { "frames": 4, "fps": 22, "loop": false, "poses": [13, 6, 6, 6] },
+    "hit": { "frames": 5, "fps": 22, "loop": false, "poses": [14, 14, 14, 13, 0] },
+    "knockdown": { "frames": 9, "fps": 20, "loop": false, "poses": [14, 14, 16, 16, 16, 16, 16, 16, 16] },
+    "getup": { "frames": 9, "fps": 22, "loop": false, "poses": [16, 16, 18, 18, 6, 13, 0, 0, 0] },
+    "ko": { "frames": 9, "fps": 20, "loop": false, "poses": [14, 14, 16, 16, 16, 16, 16, 16, 16] },
+    "victory": { "frames": 8, "fps": 14, "loop": false, "poses": [0, 13, 2, 17, 17, 17, 17, 17] },
+    "defeat": { "frames": 8, "fps": 16, "loop": false, "poses": [0, 14, 14, 18, 18, 18, 18, 18] }
+  },
+  "golpes": {
+    "punch": {
+      "dano": 6,
+      "knockback": 44,
+      "alcance": [12, 109]
+    },
+    "punch_step": {
+      "dano": 7,
+      "knockback": 55,
+      "alcance": [10, 113]
+    },
+    "punch_elbow": {
+      "startup": 4,
+      "ativo": 4,
+      "recovery": 9,
+      "dano": 8,
+      "knockback": 59,
+      "alcance": [8, 108],
+      "altura": [-170, -112],
+      "cancelavel": true,
+      "tipo_altura": "alto"
+    },
+    "punch_hook": {
+      "startup": 6,
+      "ativo": 4,
+      "recovery": 11,
+      "dano": 9,
+      "knockback": 135,
+      "alcance": [10, 111],
+      "altura": [-163, -105],
+      "cancelavel": false,
+      "tipo_altura": "alto"
+    },
+    "kick": {
+      "startup": 8,
+      "ativo": 5,
+      "dano": 10
+    },
+    "kick_mid": {
+      "dano": 9
+    },
+    "kick_side": {
+      "startup": 8,
+      "ativo": 5,
+      "recovery": 12,
+      "dano": 11,
+      "knockback": 165,
+      "alcance": [16, 143],
+      "altura": [-147, -76],
+      "cancelavel": false,
+      "tipo_altura": "medio"
+    },
+    "kick_knee": {
+      "startup": 5,
+      "ativo": 5,
+      "recovery": 12,
+      "dano": 11,
+      "knockback": 126,
+      "alcance": [8, 113],
+      "altura": [-137, -70],
+      "cancelavel": true,
+      "tipo_altura": "medio"
+    },
+    "agarra": {
+      "dano": 14,
+      "startup": 8,
+      "ativo": 5,
+      "alcance": [7, 93],
+      "alvoNoChao": true
+    },
+    "fireball": {
+      "startup": 8,
+      "ativo": 5
+    },
+    "sonic": {
+      "startup": 11,
+      "ativo": 5
+    }
+  }
+}

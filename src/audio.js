@@ -72,6 +72,15 @@ class AudioFX {
     this._tom(220, 90, 0.1, "square", 0.5);
     this._ruido(0.06, 0.25, 1200);
   }
+
+  capoeira(efeito) {
+    if (!this.ligado) return;
+    const rajada = efeito === "projetil" || efeito === "final";
+    const carga = efeito === "especial";
+    this._ruido(rajada ? 0.23 : 0.12, 0.18, rajada ? 2600 : 1350);
+    this._tom(carga ? 130 : 390, carga ? 430 : 120, carga ? 0.32 : 0.12, "sine", 0.14);
+    if (rajada) this._tom(620, 260, 0.22, "triangle", 0.12, 0.035);
+  }
   chute() {
     if (!this.ligado) return;
     this._tom(160, 60, 0.16, "sawtooth", 0.5);
@@ -81,6 +90,42 @@ class AudioFX {
     if (!this.ligado) return;
     this._tom(520, 180, 0.22, "sine", 0.4);
     this._tom(260, 90, 0.22, "triangle", 0.25);
+  }
+  ondaSonica() {
+    if (!this.ligado) return;
+    this._tom(165, 61, 0.24, "triangle", 0.42);
+    this._tom(210, 83, 0.19, "sine", 0.24, 0.055);
+    this._ruido(0.17, 0.17, 750);
+  }
+  graveGreeg() {
+    if (!this.ligado) return;
+    this._tom(105, 41, 0.34, "sine", 0.68);
+    this._tom(132, 49, 0.22, "triangle", 0.27, 0.07);
+    this._ruido(0.14, 0.19, 710);
+  }
+  rajadaMorgana() {
+    if (!this.ligado) return;
+    this._ruido(0.39, 0.34, 1700);
+    this._tom(190, 73, 0.31, "triangle", 0.22);
+  }
+  navegacaoMetalMenu() {
+    if (!this.ligado) return;
+    this._tom(1320, 1190, 0.08, "sine", 0.16);
+    this._tom(2180, 1920, 0.04, "triangle", 0.05, 0.009);
+  }
+  trovaoMorgana() {
+    if (!this.ligado) return;
+    this._ruido(0.3, 0.42, 1750);
+    this._tom(120, 39, 0.29, "triangle", 0.3);
+  }
+  impactoTrindade(indice) {
+    if (!this.ligado) return;
+    this._tom(290 - indice * 53, 100 - indice * 16, 0.09 + indice * 0.025, "triangle", 0.23);
+  }
+  corteAr() {
+    if (!this.ligado) return;
+    this._ruido(0.13, 0.32, 3400);
+    this._tom(710, 190, 0.12, "triangle", 0.13);
   }
   acerto() {
     if (!this.ligado) return;
